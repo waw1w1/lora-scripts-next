@@ -70,8 +70,9 @@ def seed(source, destination):
         .decode()
         .strip()
     )
-    if upstream.startswith("origin/"):
-        branch = upstream.removeprefix("origin/")
+    update_branch = (
+        upstream.removeprefix("origin/") if upstream.startswith("origin/") else branch
+    )
     remote = git(source, "remote", "get-url", "origin").decode().strip()
     expected = git(source, "rev-parse", "HEAD").strip()
     subprocess.run(
@@ -82,15 +83,25 @@ def seed(source, destination):
             "--single-branch",
             "--branch",
             branch,
-            remote,
+            source.resolve().as_uri(),
             str(destination),
         ],
         check=True,
     )
     if git(destination, "rev-parse", "HEAD").strip() != expected:
         raise RuntimeError(
-            "Remote branch differs from build source HEAD. Sync and rebuild with -Clean."
+            "Source HEAD changed during the build snapshot. Retry with -Clean."
         )
+    if update_branch != branch:
+        git(destination, "branch", "-m", update_branch)
+    git(destination, "remote", "set-url", "origin", remote)
+    git(destination, "remote", "set-branches", "origin", update_branch)
+    git(
+        destination,
+        "config",
+        f"branch.{update_branch}.merge",
+        f"refs/heads/{update_branch}",
+    )
     verify(destination)
 
 

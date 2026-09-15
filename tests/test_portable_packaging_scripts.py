@@ -1,7 +1,20 @@
 from pathlib import Path
+import re
+import runpy
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_bootstrap_download_manifest_matches_git_allowlist():
+    common = (ROOT / "scripts/portable/portable_updater_common.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+    destinations = re.findall(r'Dest = "Next-Trainer/([^"]+)"', common)
+    helper = runpy.run_path(str(ROOT / "scripts/portable/portable_git.py"))
+    assert set(destinations) == set(helper["BOOTSTRAP_FILES"])
+    for path in destinations:
+        assert (ROOT / path).is_file(), path
 
 
 def test_packaged_update_helper_delegates_to_root_updater():

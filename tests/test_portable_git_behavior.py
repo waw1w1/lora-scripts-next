@@ -447,18 +447,31 @@ class PortableGitBehavior(unittest.TestCase):
         self.assert_data()
 
     def test_seed_uses_upstream_branch_for_build_worktree(self):
+        original_source = self.source
+        worktree = self.root / "build-worktree"
         self.git(
             self.source,
-            "checkout",
+            "worktree",
+            "add",
             "-b",
             "temporary-build",
             "--track",
+            str(worktree),
             "origin/portable-test",
         )
+        self.source = worktree
         self.package = self.root / "second-package"
         self.helper("seed", source=True)
         self.assertEqual(
             self.git(self.package, "branch", "--show-current").strip(), b"portable-test"
+        )
+        self.source = original_source
+        self.write(self.source, "gui.py", b"next published version\n")
+        self.commit("publish next version")
+        self.git(self.package, "fetch", "origin", "--deepen=50")
+        self.helper("update")
+        self.assertEqual(
+            (self.package / "gui.py").read_bytes(), b"next published version\n"
         )
 
     def test_seed_rejects_uncommitted_source(self):
@@ -467,12 +480,28 @@ class PortableGitBehavior(unittest.TestCase):
         self.assertNotEqual(self.helper("seed", source=True, ok=False).returncode, 0)
         self.assertFalse(self.package.exists())
 
-    def test_seed_rejects_mismatched_remote_commit(self):
+    def test_seed_builds_committed_local_changes_without_remote_access(self):
         self.package = self.root / "second-package"
         self.write(self.source, "gui.py", b"unpublished code")
         self.git(self.source, "add", "gui.py")
         self.git(self.source, "commit", "-m", "unpublished")
-        self.assertNotEqual(self.helper("seed", source=True, ok=False).returncode, 0)
+        self.git(
+            self.source,
+            "remote",
+            "set-url",
+            "origin",
+            "https://example.invalid/offline.git",
+        )
+        self.helper("seed", source=True)
+        self.assertEqual(
+            self.git(self.package, "rev-parse", "HEAD"),
+            self.git(self.source, "rev-parse", "HEAD"),
+        )
+        self.assertEqual((self.package / "gui.py").read_bytes(), b"unpublished code")
+        self.assertEqual(
+            self.git(self.package, "remote", "get-url", "origin").strip(),
+            b"https://example.invalid/offline.git",
+        )
 
 
 if __name__ == "__main__":

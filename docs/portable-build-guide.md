@@ -116,10 +116,11 @@ git worktree add -b build_portable_candidate D:\build\lora-scripts-next-portable
 cd D:\build\lora-scripts-next-portable
 ```
 
-Git 整合包要求构建基线已推送到 `origin`，远端提交与本地 HEAD 一致。
-构建器优先使用当前分支跟踪的 `origin` 分支，避免让用户跟随临时构建分支更新。
-`00-build-frontend.ps1` 重建后若 `frontend/dist` 有变化，应先提交并推送构建产物再打包；
-构建器不会把未提交代码混入远端 `.git`。已有输出目录须用 `-Clean` 重建。
+Git 整合包从本地已提交的 HEAD 创建完整浅克隆，不要求构建前推送，也不访问远端来复制代码。
+包内仍保留原 `origin` 地址，优先使用当前分支跟踪的 `origin` 分支作为更新分支。
+`00-build-frontend.ps1` 重建后若 `frontend/dist` 有变化，应先提交再打包，确保工作树与 `.git` 一致。
+已有输出目录须用 `-Clean` 重建，避免覆盖旧产物或混入其他包型的运行文件。
+正式分发前仍应发布对应提交，确保用户后续能从远端更新。
 
 ---
 

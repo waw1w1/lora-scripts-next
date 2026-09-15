@@ -215,8 +215,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
 当前主线已移除子模块及 `.gitmodules`，不再下载不存在的文件。
 
 新包以完整浅克隆作为 `Next-Trainer/` 基底，保留全部已跟踪文件和 dotfile；
-克隆提交必须等于构建源提交，不能再只搬 `.git`。构建前提交生成的 `frontend/dist`，
-推送所构建分支；复用已有输出目录时使用 `-Clean`。
+浅克隆直接来自本地已提交的构建源，不能再只搬 `.git`，也不要求构建前推送远端。
+构建前提交生成的 `frontend/dist`；已有输出目录使用 `-Clean`，正式分发前发布对应提交。
 归档前（包括 `-Skip7z`）强制检查已跟踪工作树与 HEAD 一致、用户目录受忽略规则保护，
 并执行 `tests/test_portable_git_behavior.py` 的真实 Git 更新测试。
 发布验收器也执行这两项，CI 在 Windows/Linux 执行回归测试。
