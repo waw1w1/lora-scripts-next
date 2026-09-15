@@ -1,0 +1,174 @@
+"""Git operations shared by the portable builder and updater (stdlib only)."""
+
+import argparse
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+DATA_PROBES = (
+    "sd-models/portable-check.safetensors",
+    "train/portable-check/image.png",
+    "output/portable-check.safetensors",
+    "logs/portable-check.log",
+    "toml/autosave/portable-check.toml",
+    "config/autosave/portable-check.toml",
+)
+
+BOOTSTRAP_FILES = (
+    ".gitignore",
+    ".gitattributes",
+    "scripts/portable/portable_git.py",
+    "scripts/portable/update_from_release.ps1",
+    "scripts/portable/bootstrap_portable_updaters.ps1",
+    "scripts/portable/show_portable_update_status.ps1",
+    "scripts/portable/portable_updater_common.ps1",
+    "scripts/portable/sync_portable_root_launchers.bat",
+    "scripts/portable/UPDATER_VERSION",
+    "scripts/portable/templates/Update-Next-Trainer.bat",
+    "scripts/portable/templates/Update-Next-Trainer-Release.bat",
+)
+
+
+def git(root, *args):
+    return subprocess.check_output(["git", "-C", str(root), *args])
+
+
+def verify(root):
+    """Reject incomplete/modified tracked trees and exposed user data paths."""
+    for name in (".gitignore", ".gitattributes"):
+        if not (root / name).is_file():
+            raise RuntimeError(f"Package is missing {name}")
+    changes = git(root, "status", "--porcelain", "--untracked-files=no")
+    if changes:
+        raise RuntimeError(
+            "Package tracked files differ from HEAD:\n"
+            + changes.decode(errors="replace")
+        )
+    for path in DATA_PROBES:
+        git(root, "check-ignore", "--no-index", "--quiet", "--", path)
+
+
+def seed(source, destination):
+    """Keep a complete shallow checkout, including dotfiles, at the build commit."""
+    if destination.exists():
+        raise RuntimeError(
+            f"Build destination already exists: {destination}. Use -Clean."
+        )
+    if git(source, "status", "--porcelain", "--untracked-files=no"):
+        raise RuntimeError(
+            "Commit tracked source/build output changes before packaging."
+        )
+    branch = git(source, "branch", "--show-current").decode().strip()
+    if not branch:
+        raise RuntimeError("Build from a branch, not a detached HEAD.")
+    upstream = (
+        git(
+            source, "for-each-ref", "--format=%(upstream:short)", f"refs/heads/{branch}"
+        )
+        .decode()
+        .strip()
+    )
+    if upstream.startswith("origin/"):
+        branch = upstream.removeprefix("origin/")
+    remote = git(source, "remote", "get-url", "origin").decode().strip()
+    expected = git(source, "rev-parse", "HEAD").strip()
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--depth=1",
+            "--single-branch",
+            "--branch",
+            branch,
+            remote,
+            str(destination),
+        ],
+        check=True,
+    )
+    if git(destination, "rev-parse", "HEAD").strip() != expected:
+        raise RuntimeError(
+            "Remote branch differs from build source HEAD. Sync and rebuild with -Clean."
+        )
+    verify(destination)
+
+
+def update(root):
+    root = root.resolve()
+    # FETCH_HEAD is the result of the successful fetch, including mirror fetches.
+    # Never stash/reset/clean: Git must refuse collisions, including ignored files.
+    target = git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}").decode().strip()
+    git(root, "merge-base", "--is-ancestor", "HEAD", target)
+    # Old packages shipped a cropped tree with full Git metadata. Fill only
+    # absent paths from the index; never replace an existing file or directory.
+    missing = git(root, "ls-files", "--deleted", "-z").split(b"\0")
+    for raw_path in filter(None, missing):
+        path = os.fsdecode(raw_path)
+        full = root / path
+        if os.path.lexists(full):
+            continue
+        for parent in full.parents:
+            if parent == root:
+                break
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise RuntimeError(f"User file blocks missing program path: {path}")
+        git(root, "restore", "--worktree", "--", path)
+    # Bootstrap downloads tracked scripts before the merge. Stage only files
+    # already identical to the fetched commit, with no pre-existing staged edit.
+    staged = []
+    try:
+        for path in BOOTSTRAP_FILES:
+            if not git(root, "diff", "--name-only", "--", path):
+                continue
+            if git(root, "diff", "--cached", "--name-only", "--", path):
+                continue
+            if git(root, "diff", target, "--name-only", "--", path):
+                continue
+            staged.append(path)
+            git(root, "add", "--", path)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "merge.autostash=false",
+                "merge",
+                "--ff-only",
+                "--no-autostash",
+                "--no-overwrite-ignore",
+                target,
+            ],
+            check=True,
+        )
+    finally:
+        if staged:
+            # On failure restore the original index; on success HEAD contains
+            # exactly these files. Neither case writes to the working tree.
+            git(root, "restore", "--staged", "--source=HEAD", "--", *staged)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("seed", "verify", "update"))
+    parser.add_argument("--trainer-dir", type=Path, required=True)
+    parser.add_argument("--source", type=Path)
+    args = parser.parse_args()
+    try:
+        if args.action == "seed":
+            if args.source is None:
+                parser.error("seed requires --source")
+            seed(args.source, args.trainer_dir)
+        elif args.action == "verify":
+            verify(args.trainer_dir)
+        else:
+            update(args.trainer_dir)
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
+        print(f"Portable Git {args.action} stopped: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -112,9 +112,14 @@ git log -1 --oneline
 推荐：单独 worktree 构建，避免踩开发目录。
 
 ```powershell
-git worktree add D:\build\lora-scripts-next-portable origin/dev
+git worktree add -b build_portable_candidate D:\build\lora-scripts-next-portable origin/dev
 cd D:\build\lora-scripts-next-portable
 ```
+
+Git 整合包要求构建基线已推送到 `origin`，远端提交与本地 HEAD 一致。
+构建器优先使用当前分支跟踪的 `origin` 分支，避免让用户跟随临时构建分支更新。
+`00-build-frontend.ps1` 重建后若 `frontend/dist` 有变化，应先提交并推送构建产物再打包；
+构建器不会把未提交代码混入远端 `.git`。已有输出目录须用 `-Clean` 重建。
 
 ---
 
