@@ -88,6 +88,52 @@ class PortableGitBehavior(unittest.TestCase):
         for path, data in DATA.items():
             self.write(self.package, path, data)
 
+    def legacy_bootstrap(self):
+        path = "scripts/portable/portable_git.py"
+        self.git(self.source, "rm", path)
+        self.commit("old version without helper")
+        self.package = self.root / "legacy-package"
+        self.helper("seed", source=True)
+        self.put_data()
+        self.write(self.package, "docs/guide.md", b"saved user notes\n")
+        self.git(self.package, "stash", "push", "-m", "existing backup")
+        self.incoming(path, HELPER.read_bytes())
+        self.write(self.package, path, HELPER.read_bytes())
+        return path
+
+    def test_first_upgrade_adopts_new_bootstrap_file(self):
+        path = self.legacy_bootstrap()
+        before = self.git(self.package, "stash", "list")
+        self.helper("update")
+        self.assert_data()
+        self.assertEqual(self.git(self.package, "stash", "list"), before)
+        self.assertEqual(
+            self.git(self.package, "status", "--porcelain", "--untracked-files=no"), b""
+        )
+        self.assertEqual((self.package / path).read_bytes(), HELPER.read_bytes())
+
+    def test_new_bootstrap_with_different_content_is_not_overwritten(self):
+        path = self.legacy_bootstrap()
+        self.write(self.package, path, b"user-owned content\n")
+        before = self.git(self.package, "ls-files", "--stage")
+        self.assertNotEqual(self.helper("update", ok=False).returncode, 0)
+        self.assertEqual((self.package / path).read_bytes(), b"user-owned content\n")
+        self.assertEqual(self.git(self.package, "ls-files", "--stage"), before)
+        self.assert_data()
+
+    def test_failed_first_upgrade_restores_index_and_keeps_download(self):
+        path = self.legacy_bootstrap()
+        self.incoming("gui.py", b"incoming code\n")
+        self.write(self.package, "gui.py", b"user edit\n")
+        before = self.git(self.package, "ls-files", "--stage")
+        stash = self.git(self.package, "stash", "list")
+        self.assertNotEqual(self.helper("update", ok=False).returncode, 0)
+        self.assertEqual(self.git(self.package, "ls-files", "--stage"), before)
+        self.assertEqual(self.git(self.package, "stash", "list"), stash)
+        self.assertEqual((self.package / path).read_bytes(), HELPER.read_bytes())
+        self.assertEqual((self.package / "gui.py").read_bytes(), b"user edit\n")
+        self.assert_data()
+
     def assert_data(self):
         for path, data in DATA.items():
             self.assertEqual((self.package / path).read_bytes(), data, path)

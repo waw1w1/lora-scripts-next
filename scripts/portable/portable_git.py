@@ -119,12 +119,27 @@ def update(root):
     staged = []
     try:
         for path in BOOTSTRAP_FILES:
-            if not git(root, "diff", "--name-only", "--", path):
-                continue
             if git(root, "diff", "--cached", "--name-only", "--", path):
                 continue
-            if git(root, "diff", target, "--name-only", "--", path):
-                continue
+            if git(root, "ls-files", "--", path):
+                if not git(root, "diff", "--name-only", "--", path):
+                    continue
+                if git(root, "diff", target, "--name-only", "--", path):
+                    continue
+            else:
+                # First bootstrap installs files absent from the old commit.
+                # Only adopt regular allowlisted files matching the target blob.
+                full = root / path
+                if not full.is_file() or full.is_symlink():
+                    continue
+                entry = git(root, "ls-tree", target, "--", path).split()
+                if len(entry) != 4 or entry[0] not in (b"100644", b"100755"):
+                    continue
+                if (
+                    git(root, "hash-object", f"--path={path}", "--", path).strip()
+                    != entry[2]
+                ):
+                    continue
             staged.append(path)
             git(root, "add", "--", path)
         subprocess.run(
