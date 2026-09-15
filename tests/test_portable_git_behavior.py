@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -137,6 +138,115 @@ class PortableGitBehavior(unittest.TestCase):
     def assert_data(self):
         for path, data in DATA.items():
             self.assertEqual((self.package / path).read_bytes(), data, path)
+
+    def test_cropped_crlf_blob_updates_without_false_local_changes(self):
+        path = "build-scripts/legacy.ps1"
+        self.write(self.source, path, b"Write-Host old\r\n")
+        # Commit the historical blob before attributes began normalizing it.
+        self.commit("legacy CRLF blob")
+        self.write(self.source, ".gitattributes", b"*.ps1 text eol=crlf\n")
+        self.git(self.source, "add", ".gitattributes")
+        self.git(self.source, "commit", "-m", "enable text normalization")
+        self.git(self.source, "push", "origin", "HEAD")
+        self.package = self.root / "legacy-crlf-package"
+        self.run_cmd(
+            "git",
+            "clone",
+            "--branch",
+            "portable-test",
+            self.origin.as_uri(),
+            str(self.package),
+        )
+        (self.package / path).unlink()
+        (self.package / "docs/guide.md").unlink()
+        (self.package / "tests/example.py").unlink()
+        self.put_data()
+        self.git(self.source, "rm", "tests/example.py")
+        self.incoming(path, b"Write-Host new\n")
+        self.helper("update")
+        self.assert_data()
+        self.assertEqual(
+            (self.package / path).read_bytes().replace(b"\r\n", b"\n"),
+            b"Write-Host new\n",
+        )
+        self.assertEqual((self.package / "docs/guide.md").read_bytes(), b"old guide\n")
+        self.assertFalse((self.package / "tests/example.py").exists())
+        self.assertEqual(
+            self.git(self.package, "status", "--porcelain", "--untracked-files=no"), b""
+        )
+
+    def test_failed_update_does_not_restore_missing_old_files(self):
+        (self.package / "docs/guide.md").unlink()
+        self.incoming()
+        self.write(self.package, "gui.py", b"user changes\n")
+        before = self.git(self.package, "ls-files", "--stage")
+        self.assertNotEqual(self.helper("update", ok=False).returncode, 0)
+        self.assertFalse((self.package / "docs/guide.md").exists())
+        self.assertEqual(self.git(self.package, "ls-files", "--stage"), before)
+
+    def test_real_v300_cropped_package_upgrade(self):
+        if self.run_cmd(
+            "git", "-C", str(ROOT), "rev-parse", "--verify", "v3.0.0^{commit}", ok=False
+        ).returncode:
+            self.skipTest("v3.0.0 history unavailable in shallow release checkout")
+        self.package = self.root / "v300-package"
+        self.run_cmd(
+            "git", "clone", "--shared", "--no-checkout", str(ROOT), str(self.package)
+        )
+        self.git(self.package, "checkout", "-b", "legacy", "v3.0.0")
+        keep_dirs = {
+            "assets",
+            "mikazuki",
+            "frontend",
+            "config",
+            "scripts",
+            "vendor",
+            "train_monitor",
+        }
+        keep_files = {
+            "gui.py",
+            "run_gui.bat",
+            "requirements.txt",
+            "setup_environment.py",
+            "VERSION",
+            "LICENSE",
+            "NOTICE.md",
+            "CHANGELOG.md",
+            "README.md",
+            "README-zh.md",
+        }
+        for raw in self.git(self.package, "ls-files", "-z").split(b"\0"):
+            if not raw:
+                continue
+            path = Path(os.fsdecode(raw))
+            full = self.package / path
+            if (
+                path.parts[0] not in keep_dirs
+                and str(path) not in keep_files
+                and (full.is_file() or full.is_symlink())
+            ):
+                full.unlink()
+        # Emulate the real bootstrap manifest, including its source/destination mapping.
+        manifest = (ROOT / "scripts/portable/portable_updater_common.ps1").read_text(
+            encoding="utf-8-sig"
+        )
+        for source, destination in re.findall(
+            r'Src = "([^"]+)"; Dest = "Next-Trainer/([^"]+)"', manifest
+        ):
+            payload = self.git(ROOT, "show", f"HEAD:{source}")
+            self.write(self.package, destination, payload)
+        self.put_data()
+        self.git(self.package, "fetch", str(ROOT), "HEAD")
+        self.helper("update")
+        self.assertEqual(
+            self.git(self.package, "rev-parse", "HEAD"),
+            self.git(ROOT, "rev-parse", "HEAD"),
+        )
+        self.assert_data()
+        self.assertEqual(self.git(self.package, "stash", "list"), b"")
+        # Raw bootstrap downloads can use LF while checkout requests CRLF.
+        # Compare content with HEAD rather than working-EOL/stat hints.
+        self.git(self.package, "diff", "--exit-code", "HEAD")
 
     def test_seed_is_complete_clean_shallow_checkout(self):
         self.assertTrue((self.package / "docs/guide.md").is_file())

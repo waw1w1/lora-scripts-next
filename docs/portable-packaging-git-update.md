@@ -187,14 +187,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File `
    - 若整合包是浅克隆，使用 `--deepen=50` 补齐部分历史，避免看不到共同祖先导致 `--ff-only` 失败
    - 每个镜像之间等待 2 秒
    - 全部失败则输出排障建议并退出
-6. 自动修复旧包裁剪造成的文件缺失：
-   - 仅从 Git 索引补齐完全不存在的路径；遇到现有文件、目录或链接挡路时不覆盖
+6. 检查旧包裁剪造成的文件缺失：
+   - 遇到现有文件、目录或链接挡路时不覆盖；不在合并前还原旧版文件
    - bootstrap 下载的文件若与目标提交完全一致，自动衔接；保留用户原有暂存改动
 7. 只对本次成功 fetch 的 FETCH_HEAD 快进：
    - git merge --ff-only --no-autostash --no-overwrite-ignore <本次抓取的提交>
    - 不创建 stash，不搬走未跟踪或已忽略的数据；不回退到可能过期的 origin/<branch>
    - 无冲突的本地修改保留；确有文件冲突或本地提交分叉时停止，不强制覆盖
 8. 刷新根目录启动器：
+   - 合并成功后，从新索引补齐仍然缺失的文件；新版已删除的文件不恢复
    - scripts/portable/sync_portable_root_launchers.bat --nopause
 9. 输出当前版本和成功提示
 ```

@@ -100,9 +100,10 @@ def update(root):
     # Never stash/reset/clean: Git must refuse collisions, including ignored files.
     target = git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}").decode().strip()
     git(root, "merge-base", "--is-ancestor", "HEAD", target)
-    # Old packages shipped a cropped tree with full Git metadata. Fill only
-    # absent paths from the index; never replace an existing file or directory.
+    # Validate missing paths before merging, but do not restore old blobs yet:
+    # historical CRLF blobs can appear dirty under the current text attributes.
     missing = git(root, "ls-files", "--deleted", "-z").split(b"\0")
+    repair_paths = []
     for raw_path in filter(None, missing):
         path = os.fsdecode(raw_path)
         full = root / path
@@ -113,7 +114,7 @@ def update(root):
                 break
             if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
                 raise RuntimeError(f"User file blocks missing program path: {path}")
-        git(root, "restore", "--worktree", "--", path)
+        repair_paths.append(path)
     # Bootstrap downloads tracked scripts before the merge. Stage only files
     # already identical to the fetched commit, with no pre-existing staged edit.
     staged = []
@@ -162,6 +163,12 @@ def update(root):
             # On failure restore the original index; on success HEAD contains
             # exactly these files. Neither case writes to the working tree.
             git(root, "restore", "--staged", "--source=HEAD", "--", *staged)
+
+    # Merge materializes changed files itself. Fill only paths still missing
+    # from the new checkout, excluding files removed by the update.
+    for path in repair_paths:
+        if not os.path.lexists(root / path) and git(root, "ls-files", "--", path):
+            git(root, "restore", "--worktree", "--", path)
 
 
 def main():
