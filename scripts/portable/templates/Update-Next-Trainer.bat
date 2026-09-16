@@ -107,7 +107,7 @@ echo.
 
 set "IS_SHALLOW=false"
 for /f "tokens=*" %%s in ('git rev-parse --is-shallow-repository 2^>nul') do set "IS_SHALLOW=%%s"
-set "FETCH_DEPTH_ARG=--depth=1"
+set "FETCH_DEPTH_ARG="
 if /I "!IS_SHALLOW!"=="true" (
     set "FETCH_DEPTH_ARG=--deepen=50"
     echo Shallow git checkout detected; deepening history for safe fast-forward.
