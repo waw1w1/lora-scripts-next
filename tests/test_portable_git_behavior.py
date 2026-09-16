@@ -274,6 +274,16 @@ class PortableGitBehavior(unittest.TestCase):
         self.assert_data()
         self.assertEqual(self.git(self.package, "stash", "list"), b"")
 
+    def test_update_accepts_lf_worktree_with_crlf_checkout_rules(self):
+        path = "frontend/page.vue"
+        self.write(self.source, ".gitattributes", b"*.vue text eol=crlf\n")
+        self.incoming(path, b"old page\n")
+        self.helper("update")
+        self.incoming(path, b"new page\n")
+        self.write(self.package, path, b"old page\n")
+        self.helper("update")
+        self.assertEqual((self.package / path).read_bytes(), b"new page\r\n")
+
     def assert_conflict_preserved(self, path):
         self.put_data()
         self.write(self.package, "gui.py", b"saved old edit\n")

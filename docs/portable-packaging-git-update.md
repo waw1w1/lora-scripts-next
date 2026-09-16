@@ -256,6 +256,8 @@ fast-forward update failed
 因此下载清单中的 `.bat` 文件必须在 Git blob 内就保持无 BOM 的 CRLF；仅设置 `eol=crlf` 不足以保证在线下载可执行。
 `.gitattributes` 对这些文件单独禁用文本归一化，回归测试同时检查原始 blob 并通过 Windows cmd 执行。
 
+真实旧包还可能保留与实际 LF 文件不一致的 CRLF 索引缓存。更新器只对内容和模式均与索引一致、且没有暂存改动的文件刷新缓存；真实修改和删除不会被覆盖。
+
 ## 首次依赖安装测速
 
 `setup_environment.py` 不应只测试镜像首字节延迟。PyTorch wheel 约 3 GB，首响应快不代表大文件下载快。

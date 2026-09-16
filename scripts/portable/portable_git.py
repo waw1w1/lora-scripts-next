@@ -111,6 +111,18 @@ def update(root):
     # Never stash/reset/clean: Git must refuse collisions, including ignored files.
     target = git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}").decode().strip()
     git(root, "merge-base", "--is-ancestor", "HEAD", target)
+    # Extracted releases can have LF bytes with a CRLF checkout stat cache.
+    # Re-add only content/mode-identical, unstaged files to refresh that cache;
+    # real edits, deletions, and staged changes remain untouched.
+    for raw_path in filter(None, git(root, "diff-files", "--name-only", "-z").split(b"\0")):
+        path = os.fsdecode(raw_path)
+        full = root / path
+        if not full.is_file() or full.is_symlink():
+            continue
+        if git(root, "diff", "--cached", "--name-only", "--", path):
+            continue
+        if not git(root, "diff", "--no-ext-diff", "--no-textconv", "--name-only", "--", path):
+            git(root, "add", "--", path)
     # Validate missing paths before merging, but do not restore old blobs yet:
     # historical CRLF blobs can appear dirty under the current text attributes.
     missing = git(root, "ls-files", "--deleted", "-z").split(b"\0")
