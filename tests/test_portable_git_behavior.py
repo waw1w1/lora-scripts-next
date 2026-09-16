@@ -386,14 +386,18 @@ class PortableGitBehavior(unittest.TestCase):
         )
         self.assert_windows_batch_update()
 
-    def assert_windows_batch_update(self):
+    @unittest.skipUnless(os.name == "nt", "requires Windows cmd.exe")
+    def test_windows_batch_entrypoint_from_raw_git_blob(self):
+        self.assert_windows_batch_update(raw_download=True)
+
+    def assert_windows_batch_update(self, raw_download=False):
         self.put_data()
         self.write(self.source, "gui.py", b"batch update\n")
         self.commit("batch update")
         launcher = self.root / "Update-Next-Trainer.bat"
-        launcher.write_bytes(
-            (ROOT / "build-scripts/templates/Update-Next-Trainer.bat").read_bytes()
-        )
+        path = "build-scripts/templates/Update-Next-Trainer.bat"
+        payload = self.git(ROOT, "show", f"HEAD:{path}") if raw_download else (ROOT / path).read_bytes()
+        launcher.write_bytes(payload)
         self.run_cmd(
             "cmd",
             "/c",

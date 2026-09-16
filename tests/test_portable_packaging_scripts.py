@@ -1,9 +1,21 @@
 from pathlib import Path
 import re
 import runpy
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_raw_bootstrap_batch_downloads_are_crlf_in_git():
+    common = (ROOT / "scripts/portable/portable_updater_common.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+    for path in set(re.findall(r'Src = "([^"]+\.bat)"', common)):
+        payload = subprocess.check_output(["git", "-C", str(ROOT), "show", f"HEAD:{path}"])
+        assert b"\r\n" in payload, path
+        assert b"\n" not in payload.replace(b"\r\n", b""), path
+        assert not payload.startswith(b"\xef\xbb\xbf"), path
 
 
 def test_bootstrap_download_manifest_matches_git_allowlist():
