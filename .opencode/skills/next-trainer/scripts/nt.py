@@ -202,6 +202,8 @@ def cmd_schemas(c, a):
 
 SCHEMA_FIELD_RE = re.compile(r"^\s*(\w+)\s*:\s*Schema\.")
 SKILL_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = SKILL_ROOT.parents[2]
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 def schema_pages(client: Client) -> list[dict]:
@@ -248,7 +250,7 @@ def extract_schema_fields(schema_text: str) -> list[dict]:
             field["required"] = True
         if ".hidden()" in body:
             field["hidden"] = True
-        um = re.search(r"Schema\.union\(\[(.*?)\]\)", body)
+        um = re.search(r"union\(\[(.*?)\]\)", body)
         if um:
             choices = re.findall(r"[\"']([^\"']+)[\"']", um.group(1))
             if choices:
@@ -297,22 +299,26 @@ def cmd_search(c, a):
             seen.add(key)
             if kw in json.dumps(f, ensure_ascii=False).lower():
                 param_hits.append({"page": p["name"], **f})
-                if len(param_hits) >= a.max_matches:
-                    break
-    out["schema_params"] = param_hits
+        if len(param_hits) >= a.max_matches:
+            break
+    out["schema_params"] = param_hits[: a.max_matches]
 
     doc_hits = []
-    docs = [SKILL_ROOT / "SKILL.md"] + sorted((SKILL_ROOT / "reference").glob("*.md"))
-    for doc in docs:
+    docs = [("SKILL.md", SKILL_ROOT / "SKILL.md")]
+    docs += [(f"reference/{d.name}", d) for d in sorted((SKILL_ROOT / "reference").glob("*.md"))]
+    repo_docs = REPO_ROOT / "docs"
+    if repo_docs.is_dir():
+        docs += [(f"docs/{d.name}", d) for d in sorted(repo_docs.glob("*.md"))]
+    for label, doc in docs:
         if not doc.is_file():
             continue
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
             if kw in line.lower():
-                doc_hits.append({"file": doc.name, "line": lineno, "text": line.strip()[:200]})
-                if len(doc_hits) >= a.max_matches:
-                    break
-    out["docs"] = doc_hits
-    out["hint"] = "字段详情: params <page> --filter <关键字>；文档原文: Read reference/<file>"
+                doc_hits.append({"file": label, "line": lineno, "text": line.strip()[:200]})
+        if len(doc_hits) >= a.max_matches:
+            break
+    out["docs"] = doc_hits[: a.max_matches]
+    out["hint"] = "字段详情: params <page> --filter <关键字>；文档原文: Read <file>（file 为 skill 内或仓库 docs/ 相对路径）"
     return out
 
 
@@ -424,13 +430,26 @@ def cmd_previews(c, a):
 
 
 def cmd_preview(c, a):
-    name = a.name
-    if not name:
-        data = c.request("GET", f"/api/tasks/{a.task_id}/previews")
-        images = data.get("images") if isinstance(data, dict) else None
-        if not images:
-            raise ApiError("该任务还没有预览图（确认配置已开 enable_preview 且配了 sample_prompts）")
-        name = images[-1]["name"]
+    data = c.request("GET", f"/api/tasks/{a.task_id}/previews")
+    images = data.get("images") if isinstance(data, dict) else None
+    if not images:
+        raise ApiError("该任务还没有预览图（确认配置已开 enable_preview 且配了 sample_prompts）")
+
+    if a.all:
+        out_dir = Path(a.out) if a.out else Path(tempfile.gettempdir()) / f"nt-preview-{a.task_id[:8]}"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        saved = []
+        for item in images:
+            content, media_type = c.request_raw(
+                f"/api/tasks/{a.task_id}/previews/{item['name']}", params={"thumb": 1}
+            )
+            ext = ".jpg" if "jpeg" in media_type else ".png"
+            path = out_dir / f"{item['name']}{ext}"
+            path.write_bytes(content)
+            saved.append({"path": str(path), "name": item["name"], "bytes": len(content)})
+        return {"dir": str(out_dir), "count": len(saved), "images": saved, "hint": "用 Read 工具查看图片文件"}
+
+    name = a.name or images[-1]["name"]
     content, media_type = c.request_raw(f"/api/tasks/{a.task_id}/previews/{name}", params={"thumb": 1})
     ext = ".jpg" if "jpeg" in media_type else ".png"
     out = a.out or str(Path(tempfile.gettempdir()) / f"nt-preview-{a.task_id[:8]}-{name}{ext}")
@@ -454,6 +473,11 @@ def check_config_warnings(config: dict) -> list[str]:
             )
     if isinstance(config.get("learning_rate"), str):
         warnings.append("learning_rate 是字符串——Automagic 对字符串 lr 会 TypeError，请传 JSON 数值。")
+    if config.get("gpu_ids") not in (None, "", []):
+        warnings.append(
+            "gpu_ids 在部分后端版本会触发 500（非 JSON 响应）；单卡环境建议省略该字段，"
+            "让后端默认分配，确认多卡需求再填写。"
+        )
     return warnings
 
 
@@ -599,8 +623,22 @@ def cmd_health(c, a):
         return {"alive": False, "reason": str(exc)}
 
 
+def _require_local_base_url(client: Client):
+    """start/stop manage local processes by port lookup; a remote base-url would
+    target the wrong machine (or kill an unrelated local process)."""
+    from urllib.parse import urlparse
+
+    host = urlparse(client.base_url).hostname or ""
+    if host not in LOCAL_HOSTS:
+        raise ApiError(
+            f"start/stop 只能操作本机服务（当前 base-url 主机为 {host!r}）；"
+            "远程机器请 ssh 上去后再执行。"
+        )
+
+
 def cmd_start(c, a):
-    """后台启动应用（run_gui.sh / run_gui.bat）。已活着则直接返回。"""
+    """后台启动应用（run_gui.sh / run_gui.bat）。已活着则直接返回。仅限本机。"""
+    _require_local_base_url(c)
     alive = cmd_health(c, a)
     if alive["alive"]:
         return {"started": False, "already_running": True, "version": alive.get("version")}
@@ -643,8 +681,9 @@ def cmd_start(c, a):
 def cmd_stop(c, a):
     """停止应用：按 base-url 端口找监听进程，发 SIGTERM（等价 Ctrl+C，应用会自清理子进程）。
 
-    ⚠️ 会中断正在进行的训练，调用前必须获得用户明确确认。
+    ⚠️ 会中断正在进行的训练，调用前必须获得用户明确确认。仅限本机。
     """
+    _require_local_base_url(c)
     port = _port_from_base_url(c.base_url)
     pid = _find_pid_by_port(port)
     if pid is None:
@@ -729,7 +768,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("preview", cmd_preview, help="下载预览图到本地并打印路径（用 Read 看图）")
     p.add_argument("task_id")
     p.add_argument("name", nargs="?", default="")
-    p.add_argument("--out", default="")
+    p.add_argument("--out", default="", help="单张为文件路径；--all 时为输出目录")
+    p.add_argument("--all", action="store_true", help="下载该任务全部预览图")
 
     p = add("validate", cmd_validate, help="校验训练配置（不提交）")
     p.add_argument("page_train_type")
