@@ -147,6 +147,7 @@ export default {
       jump: "跳轉並匯入",
       cancel: "取消",
       fail: "設定匯入失敗",
+      animaFastDurationConflict: "設定同時包含 epoch 和 steps 訓練時長；已優先使用 Epoch 並忽略 max_train_steps。",
     },
     exportFail: "設定匯出失敗",
     submitConfirm: {
@@ -167,6 +168,7 @@ export default {
       prodigyLr: "Prodigy 建議將 unet_lr、text_encoder_lr 設為 1",
       oftSdxl: "OFT 目前僅對 SDXL 可用",
       conflict: "參數 {left} 與 {right} 衝突，請只啟用其中一個",
+      animaFastTorchCompile: "attn_mode=torch 或留空時不能啟用 torch_compile",
     },
     schemas: {
       "sd3-lora": { title: "Anima LoRA", area: "Anima DiT · Kohya-ss · LoRA" },
@@ -354,6 +356,7 @@ export default {
       plugins: "外掛市場",
       about: "關於",
       changelog: "更新記錄",
+      update: "更新",
     },
     ui: {
       language: "介面語言",
@@ -574,6 +577,31 @@ export default {
     preview: "預覽（切換左側選項檢視）",
     aboutDesc: "Next Trainer 是一個強大、靈活且易用的本機訓練工具。",
     moreChangelog: "檢視更多更新記錄…",
+    update: {
+      title: "更新中心",
+      lead: "僅檢查並提示穩定版（vX.Y.Z）。預發佈（alpha / beta / rc）不會出現在此通道。",
+      current: "目前版本",
+      latestStable: "最新穩定版",
+      stableOnly: "穩定通道",
+      previewChip: "預覽版",
+      available: "發現新穩定版 v{version}",
+      uptoDate: "已是最新穩定版",
+      check: "檢查更新",
+      checking: "檢查中…",
+      checkFail: "檢查更新失敗",
+      checkFailDetail: "檢查失敗：{error}",
+      openGithub: "GitHub Releases",
+      openModelscope: "環境整合包",
+      notes: "穩定版說明（摘要）",
+      trainingBusy: "偵測到訓練任務進行中或排隊中。請先結束任務，再退出 WebUI 後更新，避免半更新。",
+      howtoTitle: "如何套用更新",
+      howto: {
+        "1": "結束正在執行的訓練，並關閉 Next Trainer WebUI。",
+        "2": "整合包使用者：執行根目錄 Update-Next-Trainer-Release.bat（建議）或 Update-Next-Trainer.bat（需 .git）。",
+        "3": "也可從 GitHub Releases 或環境整合包下載渠道取得對應穩定版 7z，按說明合併使用者資料後啟動。",
+      },
+      howtoFoot: "更新中心本期只負責檢查與引導；整包合併仍由外部更新腳本完成。",
+    },
   },
   home: {
     heroTitle: "模型訓練，從一套清晰的工作流程開始。",
@@ -592,6 +620,28 @@ export default {
       training: { title: "訓練", text: "基礎模型 × 訓練引擎 × 訓練目標，一處完成設定與提交。" },
       dataset: { title: "資料集", text: "標籤編輯與模型打標，準備訓練所需的 caption。" },
       tasks: { title: "任務", text: "檢視訓練任務狀態、記錄入口與執行監控。" },
+    },
+    carouselAria: "首頁宣傳輪播",
+    carouselPrev: "上一張",
+    carouselNext: "下一張",
+    carouselDot: "第 {n} 張",
+    sponsor: {
+      anima: {
+        badge: "解構原典社群｜Anima 官方參與",
+        caption: "Next Trainer · 活動訓練技術支援",
+        alt: "Anima 社群活動橫幅海報",
+      },
+      tutorial: {
+        badge: "B站教學｜佔位",
+        caption: "Anima 訓練教學（作者）· 正式影片將替換",
+        alt: "Anima 訓練教學影片封面（佔位）",
+      },
+      modelscope: {
+        eyebrow: "ModelScope · 魔搭",
+        title: "更多模型，盡在魔搭",
+        text: "訓練所需底模、VAE、文字編碼器等資源，可在魔搭一站取得；下載完即可回到 Next Trainer 開訓。",
+        cta: "開啟魔搭模型庫",
+      },
     },
   },
   about: {
@@ -615,6 +665,8 @@ export default {
     source: "原始碼",
     releases: "發行版本",
     issues: "問題回報",
+    lineageTitle: "致謝 Akegarasu",
+    lineageDesc: "我們感謝 Akegarasu 與 {akegarasu}（SD-Trainer / 秋葉一鍵訓練包）長期公開的本地訓練 WebUI 與整合包實踐。完整致謝見倉庫 credits 與 NOTICE。",
   },
   guide: {
     title: "新手上路",
@@ -870,7 +922,6 @@ export default {
   integration: {
     openExternal: "在新視窗開啟",
     backToTasks: "返回任務頁",
-    legacyTagEditor: "舊版標籤編輯器",
   },
   api: {
     network: "無法連線到後端",

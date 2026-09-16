@@ -202,7 +202,6 @@ export default {
   "启用 arb 桶": "啟用 arb 桶",
   "启用 arb 桶以允许非固定宽高比的图片": "啟用 arb 桶以允許非固定長闊比的圖片",
   "启用 sdpa": "啟用 sdpa",
-  "启用 torch.compile": "啟用 torch.compile",
   "启用 xformers": "啟用 xformers",
   "启用分层学习率训练（只支持网络模块 networks.lora）": "啟用分層學習率訓練（只支援網絡模組 networks.lora）",
   "启用分辨率相关的时间步偏移": "啟用解像度相關的時間步偏移",
@@ -291,8 +290,6 @@ export default {
   "最大时间步（0-1000，留空不限制）": "最大時間步（0-1000，留空不限制）",
   "最大范数正则化。如果使用，推荐为 1": "最大範數正則化。如果使用，建議為 1",
   "最大训练 epoch（轮数）": "最大訓練 epoch（輪數）",
-  "最大训练 epoch；设置后 Anima 会按 epoch 和 dataloader 长度重算 step": "最大訓練 epoch；設定後 Anima 會按 epoch 和 dataloader 長度重算 step",
-  "最大训练 step；仅在 max_train_epochs 为空时按 step 控制": "最大訓練 step；僅在 max_train_epochs 為空時按 step 控制",
   "最大训练步数（AI Toolkit 无 epoch 概念，一般 500-4000）": "最大訓練步數（AI Toolkit 無 epoch 概念，一般 500-4000）",
   "最大训练步数（设置了 epoch 时由 epoch 推导，可不填）": "最大訓練步數（設定了 epoch 時由 epoch 推導，可不填）",
   "最小信噪比伽马值, 如果启用推荐为 5": "最小訊噪比伽馬值, 如果啟用建議為 5",
@@ -411,5 +408,10 @@ export default {
   "颜色改变": "顏色改變",
   "额外训练带可学习权重的 Norm 层": "額外訓練帶可學習權重的 Norm 層",
   "高级设置": "進階設定",
-  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "進階項：自訂 network_args，一行一個 key=value；這是傳給 anima_lora LoRA 網絡模組的參數列表，不是頂層 TOML。新手謹慎使用；Fast 僅允許 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支援的 key 會中止訓練"
+  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "進階項：自訂 network_args，一行一個 key=value；這是傳給 anima_lora LoRA 網絡模組的參數列表，不是頂層 TOML。新手謹慎使用；Fast 僅允許 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支援的 key 會中止訓練",
+  "启用 torch.compile；attn_mode=torch 或留空时自动关闭（#336）": "啟用 torch.compile；attn_mode=torch 或留空時自動關閉（#336）",
+  "最大训练 epoch；Anima 会按 epoch 和 dataloader 长度重算 step": "最大訓練 epoch；Anima 會按 epoch 和 dataloader 長度重算 step",
+  "最大训练 step": "最大訓練 step",
+  "训练时长模式": "訓練時長模式",
+  "仅训练 U-Net / DiT；关闭后可训练 text encoder LoRA（不能同时使用文本编码缓存）": "僅訓練 U-Net / DiT；關閉後可訓練 text encoder LoRA（不能同時使用文字編碼快取）",
 }

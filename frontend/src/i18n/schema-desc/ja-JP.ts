@@ -202,7 +202,6 @@ export default {
   "启用 arb 桶": "arb バケットを有効化します",
   "启用 arb 桶以允许非固定宽高比的图片": "arb バケットを有効化して非固定アスペクト比の画像を許可します",
   "启用 sdpa": "SDPA を有効化します",
-  "启用 torch.compile": "torch.compile を有効化します",
   "启用 xformers": "xformers を有効化します",
   "启用分层学习率训练（只支持网络模块 networks.lora）": "層別学習率の学習を有効化します（ネットワークモジュール networks.lora のみ対応）",
   "启用分辨率相关的时间步偏移": "解像度依存のタイムステップシフトを有効化します",
@@ -291,8 +290,6 @@ export default {
   "最大时间步（0-1000，留空不限制）": "最大タイムステップ（0-1000。空欄で無制限）",
   "最大范数正则化。如果使用，推荐为 1": "最大ノルム正則化。使用する場合は 1 を推奨します",
   "最大训练 epoch（轮数）": "最大学習エポック数（周回数）",
-  "最大训练 epoch；设置后 Anima 会按 epoch 和 dataloader 长度重算 step": "最大学習エポック数。設定すると Anima はエポックと dataloader 長から step を再計算します",
-  "最大训练 step；仅在 max_train_epochs 为空时按 step 控制": "最大学習 step。max_train_epochs が空の場合のみ step ベースで制御します",
   "最大训练步数（AI Toolkit 无 epoch 概念，一般 500-4000）": "最大学習ステップ数（AI Toolkit にはエポックの概念がなく、一般的に 500-4000）",
   "最大训练步数（设置了 epoch 时由 epoch 推导，可不填）": "最大学習ステップ数（エポック設定時はエポックから導出されるため未入力可）",
   "最小信噪比伽马值, 如果启用推荐为 5": "最小 SNR ガンマ値。有効化する場合は 5 を推奨します",
@@ -411,5 +408,10 @@ export default {
   "颜色改变": "色変更",
   "额外训练带可学习权重的 Norm 层": "学習可能な重みを持つ Norm 層を追加で学習します",
   "高级设置": "詳細設定",
-  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "詳細項目：カスタム network_args。1 行に 1 つずつ key=value 形式で。これは anima_lora LoRA ネットワークモジュールに渡すパラメータリストであり、トップレベル TOML ではありません。初心者は慎重に使用してください。Fast では rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio のみ許可され、未対応の key は学習を中止します"
+  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "詳細項目：カスタム network_args。1 行に 1 つずつ key=value 形式で。これは anima_lora LoRA ネットワークモジュールに渡すパラメータリストであり、トップレベル TOML ではありません。初心者は慎重に使用してください。Fast では rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio のみ許可され、未対応の key は学習を中止します",
+  "启用 torch.compile；attn_mode=torch 或留空时自动关闭（#336）": "torch.compile を有効化；attn_mode=torch または空の場合は自動的にオフ（#336）",
+  "最大训练 epoch；Anima 会按 epoch 和 dataloader 长度重算 step": "最大トレーニング epoch；Anima は epoch と dataloader 長から step を再計算します",
+  "最大训练 step": "最大トレーニング step",
+  "训练时长模式": "トレーニング期間モード",
+  "仅训练 U-Net / DiT；关闭后可训练 text encoder LoRA（不能同时使用文本编码缓存）": "U-Net / DiT のみを学習；オフにすると text encoder LoRA も学習（テキストエンコードキャッシュと併用不可）",
 }

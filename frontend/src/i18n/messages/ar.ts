@@ -147,6 +147,7 @@ export default {
       jump: "انتقال واستيراد",
       cancel: "إلغاء",
       fail: "فشل استيراد التكوين",
+      animaFastDurationConflict: "تحتوي الإعدادات على مدتي تدريب بالـ epoch والخطوات معًا؛ تم تفضيل Epoch وتجاهل max_train_steps.",
     },
     exportFail: "فشل تصدير التكوين",
     submitConfirm: {
@@ -167,6 +168,7 @@ export default {
       prodigyLr: "يعمل Prodigy بشكل أفضل مع unet_lr و text_encoder_lr المعيّنين على 1",
       oftSdxl: "OFT متاح حاليًا لـ SDXL فقط",
       conflict: "المعلمتان {left} و {right} متعارضتان؛ فعّل واحدة منهما فقط",
+      animaFastTorchCompile: "لا يمكن تفعيل torch_compile عندما يكون attn_mode هو torch أو فارغًا",
     },
     schemas: {
       "sd3-lora": { title: "Anima LoRA", area: "Anima DiT · Kohya-ss · LoRA" },
@@ -354,6 +356,7 @@ export default {
       plugins: "متجر الإضافات",
       about: "حول",
       changelog: "سجل التغييرات",
+      update: "التحديثات",
     },
     ui: {
       language: "اللغة",
@@ -574,6 +577,31 @@ export default {
     preview: "معاينة (بدّل الخيارات من اللوحة الجانبية)",
     aboutDesc: "Next Trainer أداة تدريب محلية قوية ومرنة وسهلة الاستخدام.",
     moreChangelog: "المزيد من سجل التغييرات…",
+    update: {
+      title: "مركز التحديثات",
+      lead: "يتحقق من الإصدارات المستقرة (vX.Y.Z) ويعرضها فقط. لا تظهر الإصدارات التجريبية (alpha / beta / rc) في هذه القناة.",
+      current: "الإصدار الحالي",
+      latestStable: "أحدث إصدار مستقر",
+      stableOnly: "القناة المستقرة",
+      previewChip: "إصدار معاينة",
+      available: "يتوفر إصدار مستقر جديد v{version}",
+      uptoDate: "أنت على أحدث إصدار مستقر",
+      check: "التحقق من التحديثات",
+      checking: "جارٍ التحقق…",
+      checkFail: "فشل التحقق من التحديثات",
+      checkFailDetail: "فشل التحقق: {error}",
+      openGithub: "GitHub Releases",
+      openModelscope: "حزم البيئة",
+      notes: "ملاحظات الإصدار المستقر (ملخص)",
+      trainingBusy: "تم اكتشاف مهمة تدريب قيد التشغيل أو في قائمة الانتظار. أنهِ المهمة ثم أغلق واجهة WebUI قبل التحديث لتجنب تحديث جزئي.",
+      howtoTitle: "كيفية تطبيق التحديث",
+      howto: {
+        "1": "أوقف التدريب الجاري وأغلق واجهة Next Trainer WebUI.",
+        "2": "مستخدمو الحزمة المحمولة: شغّل Update-Next-Trainer-Release.bat (مُوصى به) أو Update-Next-Trainer.bat (يتطلب .git) في الدليل الجذر.",
+        "3": "أو نزّل ملف 7z المستقر المقابل من GitHub Releases أو من مرآة حزم البيئة، ثم ادمجه مع الحفاظ على بيانات المستخدم.",
+      },
+      howtoFoot: "يقتصر مركز التحديثات على الفحص والإرشاد؛ ولا يزال دمج الحزمة يتم عبر سكربتات التحديث الخارجية.",
+    },
   },
   home: {
     heroTitle: "تدريب النماذج، بدءًا من سير عمل واضح.",
@@ -592,6 +620,28 @@ export default {
       training: { title: "التدريب", text: "النموذج الأساسي × المحرك × الهدف — كوّن وأرسل في مكان واحد." },
       dataset: { title: "مجموعة البيانات", text: "تحرير الوسوم والوسم بالنموذج لتحضير التسميات التوضيحية للتدريب." },
       tasks: { title: "المهام", text: "عرض حالة مهام التدريب وإدخالات السجل ومراقبة التشغيل." },
+    },
+    carouselAria: "شريط العرض الترويجي للصفحة الرئيسية",
+    carouselPrev: "الشريحة السابقة",
+    carouselNext: "الشريحة التالية",
+    carouselDot: "الشريحة {n}",
+    sponsor: {
+      anima: {
+        badge: "مجتمع 解构原典 · مشاركة Anima الرسمية",
+        caption: "Next Trainer · دعم فني للتدريب في الفعالية",
+        alt: "ملصق أفقي لفعالية مجتمع Anima",
+      },
+      tutorial: {
+        badge: "درس Bilibili · عنصر نائب",
+        caption: "درس تدريب Anima (المؤلف) · سيُستبدل بالفيديو النهائي",
+        alt: "غلاف فيديو درس تدريب Anima (عنصر نائب)",
+      },
+      modelscope: {
+        eyebrow: "ModelScope",
+        title: "المزيد من النماذج على ModelScope",
+        text: "النماذج الأساسية وVAE ومُرمّزات النص وغيرها: احصل على كل ما تحتاجه للتدريب من ModelScope ثم عد إلى Next Trainer للبدء.",
+        cta: "فتح مكتبة نماذج ModelScope",
+      },
     },
   },
   about: {
@@ -615,6 +665,8 @@ export default {
     source: "الشيفرة المصدرية",
     releases: "الإصدارات",
     issues: "متتبع المشكلات",
+    lineageTitle: "شكر وتقدير لـ Akegarasu",
+    lineageDesc: "نشكر Akegarasu و{akegarasu} (SD-Trainer) على سنوات من واجهة WebUI للتدريب المحلي والحزم المحمولة المفتوحة. الشكر الكامل في ملفي credits وNOTICE بالمستودع.",
   },
   guide: {
     title: "دليل البدء",
@@ -870,7 +922,6 @@ export default {
   integration: {
     openExternal: "فتح في نافذة جديدة",
     backToTasks: "العودة إلى المهام",
-    legacyTagEditor: "محرر الوسوم القديم",
   },
   api: {
     network: "تعذر الاتصال بالخلفية",

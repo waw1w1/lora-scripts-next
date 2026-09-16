@@ -147,6 +147,7 @@ export default {
       jump: "移動してインポート",
       cancel: "キャンセル",
       fail: "設定のインポートに失敗しました",
+      animaFastDurationConflict: "設定に epoch と steps の両方のトレーニング期間が含まれています。Epoch を優先し、max_train_steps は無視されました。",
     },
     exportFail: "設定のエクスポートに失敗しました",
     submitConfirm: {
@@ -167,6 +168,7 @@ export default {
       prodigyLr: "Prodigy は unet_lr と text_encoder_lr を 1 に設定すると最適に動作します",
       oftSdxl: "OFT は現在 SDXL でのみ利用できます",
       conflict: "パラメータ {left} と {right} は競合しています。どちらか一方のみを有効にしてください",
+      animaFastTorchCompile: "attn_mode が torch または空の場合、torch_compile は有効にできません",
     },
     schemas: {
       "sd3-lora": { title: "Anima LoRA", area: "Anima DiT · Kohya-ss · LoRA" },
@@ -354,6 +356,7 @@ export default {
       plugins: "プラグインマーケットプレイス",
       about: "情報",
       changelog: "更新履歴",
+      update: "更新",
     },
     ui: {
       language: "言語",
@@ -574,6 +577,31 @@ export default {
     preview: "プレビュー（左側のオプションを切り替え）",
     aboutDesc: "Next Trainer は強力で柔軟、かつ使いやすいローカル学習ツールです。",
     moreChangelog: "さらに更新履歴…",
+    update: {
+      title: "アップデートセンター",
+      lead: "安定版（vX.Y.Z）のみを確認して通知します。プレリリース（alpha / beta / rc）はこのチャンネルに表示されません。",
+      current: "現在のバージョン",
+      latestStable: "最新の安定版",
+      stableOnly: "安定チャンネル",
+      previewChip: "プレビュー版",
+      available: "新しい安定版 v{version} があります",
+      uptoDate: "最新の安定版です",
+      check: "更新を確認",
+      checking: "確認中…",
+      checkFail: "更新の確認に失敗しました",
+      checkFailDetail: "確認に失敗しました：{error}",
+      openGithub: "GitHub Releases",
+      openModelscope: "環境パッケージ",
+      notes: "安定版リリースノート（要約）",
+      trainingBusy: "トレーニングジョブが実行中またはキュー待ちです。先にジョブを終了し、WebUI を閉じてから更新してください（中途半端な適用を防ぐため）。",
+      howtoTitle: "更新の適用方法",
+      howto: {
+        "1": "実行中のトレーニングを停止し、Next Trainer WebUI を閉じます。",
+        "2": "ポータブル版ユーザー：ルートの Update-Next-Trainer-Release.bat（推奨）または Update-Next-Trainer.bat（.git が必要）を実行します。",
+        "3": "GitHub Releases または環境パッケージのミラーから対応する安定版 7z を取得し、案内に従ってユーザーデータを引き継いでから起動します。",
+      },
+      howtoFoot: "アップデートセンターは確認と案内のみを行い、パッケージのマージは外部の更新スクリプトが実行します。",
+    },
   },
   home: {
     heroTitle: "モデル学習を、明快なワークフローから始めよう。",
@@ -592,6 +620,28 @@ export default {
       training: { title: "学習", text: "ベースモデル × エンジン × 学習対象 — 1 か所で設定と送信が完了します。" },
       dataset: { title: "データセット", text: "タグ編集とモデルタグ付けで、学習用のキャプションを準備します。" },
       tasks: { title: "タスク", text: "学習タスクの状態、ログエントリ、実行モニタリングを表示します。" },
+    },
+    carouselAria: "ホームのプロモーションカルーセル",
+    carouselPrev: "前のスライド",
+    carouselNext: "次のスライド",
+    carouselDot: "スライド {n}",
+    sponsor: {
+      anima: {
+        badge: "解构原典コミュニティ｜Anima 公式参加",
+        caption: "Next Trainer · イベントトレーニング技術サポート",
+        alt: "Anima コミュニティイベントの横長ポスター",
+      },
+      tutorial: {
+        badge: "Bilibili チュートリアル｜プレースホルダー",
+        caption: "Anima トレーニングチュートリアル（作者）· 正式版に差し替え予定",
+        alt: "Anima トレーニングチュートリアル動画のカバー（プレースホルダー）",
+      },
+      modelscope: {
+        eyebrow: "ModelScope",
+        title: "さらに多くのモデルを ModelScope で",
+        text: "トレーニングに必要なベースモデル、VAE、テキストエンコーダーなどを ModelScope でまとめて入手でき、ダウンロード後すぐ Next Trainer で学習を開始できます。",
+        cta: "ModelScope のモデルライブラリを開く",
+      },
     },
   },
   about: {
@@ -615,6 +665,8 @@ export default {
     source: "ソースコード",
     releases: "リリース",
     issues: "Issue トラッカー",
+    lineageTitle: "Akegarasu への謝辞",
+    lineageDesc: "長年にわたりローカルトレーニング WebUI とポータブルパッケージを公開してきた Akegarasu と {akegarasu}（SD-Trainer）に感謝します。謝辞の全文はリポジトリの credits と NOTICE をご覧ください。",
   },
   guide: {
     title: "はじめに",
@@ -870,7 +922,6 @@ export default {
   integration: {
     openExternal: "新しいウィンドウで開く",
     backToTasks: "タスクに戻る",
-    legacyTagEditor: "旧タグエディター",
   },
   api: {
     network: "バックエンドに接続できません",

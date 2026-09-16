@@ -202,7 +202,6 @@ export default {
   "启用 arb 桶": "Ativar buckets arb",
   "启用 arb 桶以允许非固定宽高比的图片": "Ativar buckets arb para permitir imagens com proporção não fixa",
   "启用 sdpa": "Ativar sdpa",
-  "启用 torch.compile": "Ativar torch.compile",
   "启用 xformers": "Ativar xformers",
   "启用分层学习率训练（只支持网络模块 networks.lora）": "Ativar treinamento com taxa de aprendizado por camada (suporta apenas o módulo de rede networks.lora)",
   "启用分辨率相关的时间步偏移": "Ativar deslocamento de passos de tempo dependente da resolução",
@@ -291,8 +290,6 @@ export default {
   "最大时间步（0-1000，留空不限制）": "Passo de tempo máximo (0-1000; vazio = sem limite)",
   "最大范数正则化。如果使用，推荐为 1": "Regularização de norma máxima. Se usada, recomenda-se 1",
   "最大训练 epoch（轮数）": "Épocas máximas de treinamento (número de rodadas)",
-  "最大训练 epoch；设置后 Anima 会按 epoch 和 dataloader 长度重算 step": "Épocas máximas de treinamento; quando definido, o Anima recalcula os passos conforme a época e o comprimento do dataloader",
-  "最大训练 step；仅在 max_train_epochs 为空时按 step 控制": "Passos máximos de treinamento; controla por passos apenas quando max_train_epochs estiver vazio",
   "最大训练步数（AI Toolkit 无 epoch 概念，一般 500-4000）": "Passos máximos de treinamento (o AI Toolkit não tem conceito de época; em geral 500-4000)",
   "最大训练步数（设置了 epoch 时由 epoch 推导，可不填）": "Passos máximos de treinamento (derivado da época quando definida; pode ficar vazio)",
   "最小信噪比伽马值, 如果启用推荐为 5": "Valor gama mínimo de relação sinal-ruído; se ativado, recomenda-se 5",
@@ -411,5 +408,10 @@ export default {
   "颜色改变": "Alteração de cor",
   "额外训练带可学习权重的 Norm 层": "Treinar adicionalmente camadas Norm com pesos aprendíveis",
   "高级设置": "Configurações avançadas",
-  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "Item avançado: network_args personalizados, um key=value por linha; esta é a lista de parâmetros passada ao módulo de rede LoRA do anima_lora, não TOML de nível superior. Iniciantes devem usar com cautela; no Fast são permitidos apenas rank_dropout, module_dropout, loraplus_lr_ratio, loraplus_unet_lr_ratio, loraplus_text_encoder_lr_ratio; keys não suportadas interrompem o treinamento"
+  "高级项：自定义 network_args，一行一个 key=value；这是传给 anima_lora LoRA 网络模块的参数列表，不是顶层 TOML。新手谨慎使用；Fast 仅允许 rank_dropout、module_dropout、loraplus_lr_ratio、loraplus_unet_lr_ratio、loraplus_text_encoder_lr_ratio，不支持的 key 会中止训练": "Item avançado: network_args personalizados, um key=value por linha; esta é a lista de parâmetros passada ao módulo de rede LoRA do anima_lora, não TOML de nível superior. Iniciantes devem usar com cautela; no Fast são permitidos apenas rank_dropout, module_dropout, loraplus_lr_ratio, loraplus_unet_lr_ratio, loraplus_text_encoder_lr_ratio; keys não suportadas interrompem o treinamento",
+  "启用 torch.compile；attn_mode=torch 或留空时自动关闭（#336）": "Ativar torch.compile; desativado automaticamente quando attn_mode é torch ou está vazio (#336)",
+  "最大训练 epoch；Anima 会按 epoch 和 dataloader 长度重算 step": "Máximo de epochs de treinamento; o Anima recalcula os steps a partir das epochs e do tamanho do dataloader",
+  "最大训练 step": "Máximo de steps de treinamento",
+  "训练时长模式": "Modo de duração do treinamento",
+  "仅训练 U-Net / DiT；关闭后可训练 text encoder LoRA（不能同时使用文本编码缓存）": "Treinar apenas U-Net / DiT; desative para treinar também o LoRA do codificador de texto (não pode ser usado com o cache de codificação de texto)",
 }

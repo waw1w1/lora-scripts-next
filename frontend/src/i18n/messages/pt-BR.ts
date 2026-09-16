@@ -147,6 +147,7 @@ export default {
       jump: "Ir e Importar",
       cancel: "Cancelar",
       fail: "Falha ao importar configuração",
+      animaFastDurationConflict: "A configuração contém durações em epochs e em steps. Epoch tem precedência e max_train_steps foi ignorado.",
     },
     exportFail: "Falha ao exportar configuração",
     submitConfirm: {
@@ -167,6 +168,7 @@ export default {
       prodigyLr: "Prodigy funciona melhor com unet_lr e text_encoder_lr definidos como 1",
       oftSdxl: "OFT está disponível apenas para SDXL no momento",
       conflict: "Os parâmetros {left} e {right} estão em conflito; ative apenas um deles",
+      animaFastTorchCompile: "torch_compile não pode ser ativado quando attn_mode é torch ou está vazio",
     },
     schemas: {
       "sd3-lora": { title: "Anima LoRA", area: "Anima DiT · Kohya-ss · LoRA" },
@@ -354,6 +356,7 @@ export default {
       plugins: "Loja de Plugins",
       about: "Sobre",
       changelog: "Registro de Alterações",
+      update: "Atualizações",
     },
     ui: {
       language: "Idioma",
@@ -574,6 +577,31 @@ export default {
     preview: "Pré-visualização (altere as opções à esquerda)",
     aboutDesc: "Next Trainer é uma ferramenta de treinamento local poderosa, flexível e fácil de usar.",
     moreChangelog: "Mais registros de alterações…",
+    update: {
+      title: "Central de atualizações",
+      lead: "Verifica e informa apenas versões estáveis (vX.Y.Z). Pré-lançamentos (alpha / beta / rc) não aparecem neste canal.",
+      current: "Versão atual",
+      latestStable: "Última versão estável",
+      stableOnly: "Canal estável",
+      previewChip: "Versão prévia",
+      available: "Nova versão estável v{version} disponível",
+      uptoDate: "Você já está na versão estável mais recente",
+      check: "Verificar atualizações",
+      checking: "Verificando…",
+      checkFail: "Falha ao verificar atualizações",
+      checkFailDetail: "Falha na verificação: {error}",
+      openGithub: "GitHub Releases",
+      openModelscope: "Pacotes de ambiente",
+      notes: "Notas da versão estável (resumo)",
+      trainingBusy: "Há uma tarefa de treinamento em execução ou na fila. Finalize-a e feche a WebUI antes de atualizar para evitar atualização parcial.",
+      howtoTitle: "Como aplicar uma atualização",
+      howto: {
+        "1": "Pare o treinamento em execução e feche a WebUI do Next Trainer.",
+        "2": "Usuários do pacote portátil: execute Update-Next-Trainer-Release.bat (recomendado) ou Update-Next-Trainer.bat (requer .git) na raiz.",
+        "3": "Ou baixe o 7z estável correspondente no GitHub Releases ou no mirror de pacotes de ambiente e mescle mantendo os dados do usuário.",
+      },
+      howtoFoot: "A central de atualizações apenas verifica e orienta; a fusão do pacote continua a cargo dos scripts externos.",
+    },
   },
   home: {
     heroTitle: "Treinamento de modelos, a partir de um fluxo de trabalho claro.",
@@ -592,6 +620,28 @@ export default {
       training: { title: "Treinamento", text: "Modelo base × motor × alvo — configure e envie em um só lugar." },
       dataset: { title: "Dataset", text: "Edição de tags e etiquetagem por modelo para preparar legendas para o treinamento." },
       tasks: { title: "Tarefas", text: "Veja status de tarefas de treinamento, registros de log e monitoramento de execuções." },
+    },
+    carouselAria: "Carrossel promocional da página inicial",
+    carouselPrev: "Slide anterior",
+    carouselNext: "Próximo slide",
+    carouselDot: "Slide {n}",
+    sponsor: {
+      anima: {
+        badge: "Comunidade 解构原典 · Participação oficial da Anima",
+        caption: "Next Trainer · Suporte técnico de treinamento para o evento",
+        alt: "Pôster horizontal do evento da comunidade Anima",
+      },
+      tutorial: {
+        badge: "Tutorial Bilibili · espaço reservado",
+        caption: "Tutorial de treinamento da Anima (autor) · será substituído pelo vídeo final",
+        alt: "Capa do vídeo do tutorial de treinamento da Anima (espaço reservado)",
+      },
+      modelscope: {
+        eyebrow: "ModelScope",
+        title: "Mais modelos, no ModelScope",
+        text: "Modelos base, VAE, codificadores de texto e mais: baixe no ModelScope tudo o que precisa para treinar e volte ao Next Trainer para começar.",
+        cta: "Abrir a biblioteca de modelos do ModelScope",
+      },
     },
   },
   about: {
@@ -615,6 +665,8 @@ export default {
     source: "Código-fonte",
     releases: "Releases",
     issues: "Rastreador de Problemas",
+    lineageTitle: "Agradecimentos a Akegarasu",
+    lineageDesc: "Agradecemos a Akegarasu e a {akegarasu} (SD-Trainer) pelos anos de WebUI de treinamento local e pacotes portáteis abertos. Os créditos completos estão em credits e NOTICE do repositório.",
   },
   guide: {
     title: "Primeiros Passos",
@@ -870,7 +922,6 @@ export default {
   integration: {
     openExternal: "Abrir em Nova Janela",
     backToTasks: "Voltar para Tarefas",
-    legacyTagEditor: "Editor de Tags Antigo",
   },
   api: {
     network: "Não foi possível conectar ao backend",

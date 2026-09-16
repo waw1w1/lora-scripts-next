@@ -147,6 +147,7 @@ export default {
       jump: "이동 후 가져오기",
       cancel: "취소",
       fail: "구성 가져오기에 실패했습니다",
+      animaFastDurationConflict: "설정에 epoch와 steps 학습 기간이 모두 포함되어 있습니다. Epoch를 우선 적용하고 max_train_steps는 무시했습니다.",
     },
     exportFail: "구성보내기에 실패했습니다",
     submitConfirm: {
@@ -167,6 +168,7 @@ export default {
       prodigyLr: "Prodigy는 unet_lr과 text_encoder_lr을 1로 설정할 때 가장 잘 동작합니다",
       oftSdxl: "OFT는 현재 SDXL에서만 사용할 수 있습니다",
       conflict: "파라미터 {left}와(과) {right}가 충돌합니다. 하나만 활성화하세요",
+      animaFastTorchCompile: "attn_mode가 torch이거나 비어 있을 때는 torch_compile을 사용할 수 없습니다",
     },
     schemas: {
       "sd3-lora": { title: "Anima LoRA", area: "Anima DiT · Kohya-ss · LoRA" },
@@ -354,6 +356,7 @@ export default {
       plugins: "플러그인 마켓플레이스",
       about: "정보",
       changelog: "변경 로그",
+      update: "업데이트",
     },
     ui: {
       language: "언어",
@@ -574,6 +577,31 @@ export default {
     preview: "미리보기 (왼쪽에서 옵션 전환)",
     aboutDesc: "Next Trainer는 강력하고 유연하며 사용하기 쉬운 로컬 학습 도구입니다.",
     moreChangelog: "더 많은 변경 로그…",
+    update: {
+      title: "업데이트 센터",
+      lead: "안정 버전(vX.Y.Z)만 확인하고 알립니다. 프리릴리스(alpha / beta / rc)는 이 채널에 표시되지 않습니다.",
+      current: "현재 버전",
+      latestStable: "최신 안정 버전",
+      stableOnly: "안정 채널",
+      previewChip: "미리보기 버전",
+      available: "새로운 안정 버전 v{version} 발견",
+      uptoDate: "최신 안정 버전입니다",
+      check: "업데이트 확인",
+      checking: "확인 중…",
+      checkFail: "업데이트 확인 실패",
+      checkFailDetail: "확인 실패: {error}",
+      openGithub: "GitHub Releases",
+      openModelscope: "환경 패키지",
+      notes: "안정 버전 릴리스 노트(요약)",
+      trainingBusy: "학습 작업이 실행 중이거나 대기 중입니다. 작업을 끝내고 WebUI를 종료한 후 업데이트하세요(일부만 적용되는 것을 방지).",
+      howtoTitle: "업데이트 적용 방법",
+      howto: {
+        "1": "실행 중인 학습을 종료하고 Next Trainer WebUI를 닫습니다.",
+        "2": "포터블 사용자: 루트의 Update-Next-Trainer-Release.bat(권장) 또는 Update-Next-Trainer.bat(.git 필요)을 실행하세요.",
+        "3": "GitHub Releases 또는 환경 패키지 미러에서 해당 안정 버전 7z를 받아 안내에 따라 사용자 데이터를 유지하며 병합한 후 시작하세요.",
+      },
+      howtoFoot: "업데이트 센터는 확인과 안내만 담당하며, 패키지 병합은 외부 업데이트 스크립트가 수행합니다.",
+    },
   },
   home: {
     heroTitle: "모델 학습, 명확한 워크플로우에서 시작하세요.",
@@ -592,6 +620,28 @@ export default {
       training: { title: "학습", text: "베이스 모델 × 엔진 × 학습 대상 — 한곳에서 구성하고 제출합니다." },
       dataset: { title: "데이터셋", text: "태그 편집과 모델 태깅으로 학습용 캡션을 준비합니다." },
       tasks: { title: "작업", text: "학습 작업 상태, 로그 항목, 실행 모니터링을 확인합니다." },
+    },
+    carouselAria: "홈 프로모션 캐러셀",
+    carouselPrev: "이전 슬라이드",
+    carouselNext: "다음 슬라이드",
+    carouselDot: "슬라이드 {n}",
+    sponsor: {
+      anima: {
+        badge: "解构原典 커뮤니티｜Anima 공식 참여",
+        caption: "Next Trainer · 이벤트 학습 기술 지원",
+        alt: "Anima 커뮤니티 이벤트 가로형 포스터",
+      },
+      tutorial: {
+        badge: "Bilibili 튜토리얼｜플레이스홀더",
+        caption: "Anima 학습 튜토리얼(제작자) · 정식 영상으로 교체 예정",
+        alt: "Anima 학습 튜토리얼 영상 표지(플레이스홀더)",
+      },
+      modelscope: {
+        eyebrow: "ModelScope",
+        title: "더 많은 모델은 ModelScope에서",
+        text: "학습에 필요한 베이스 모델, VAE, 텍스트 인코더 등을 ModelScope에서 한 번에 받고, 다운로드 후 바로 Next Trainer에서 학습을 시작하세요.",
+        cta: "ModelScope 모델 라이브러리 열기",
+      },
     },
   },
   about: {
@@ -615,6 +665,8 @@ export default {
     source: "소스 코드",
     releases: "릴리스",
     issues: "이슈 트래커",
+    lineageTitle: "Akegarasu에게 감사",
+    lineageDesc: "오랫동안 로컬 학습 WebUI와 포터블 패키지를 공개해 온 Akegarasu와 {akegarasu}(SD-Trainer)에 감사드립니다. 전체 크레딧은 저장소의 credits와 NOTICE를 참조하세요.",
   },
   guide: {
     title: "시작하기",
@@ -870,7 +922,6 @@ export default {
   integration: {
     openExternal: "새 창에서 열기",
     backToTasks: "작업으로 돌아가기",
-    legacyTagEditor: "레거시 태그 편집기",
   },
   api: {
     network: "백엔드에 연결할 수 없습니다",
