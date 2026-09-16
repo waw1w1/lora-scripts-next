@@ -350,6 +350,44 @@ class PortableGitBehavior(unittest.TestCase):
         self.assertEqual((self.package / path).read_bytes(), content)
         self.assertEqual((self.package / "gui.py").read_bytes(), b"user edit\n")
 
+    def test_bootstrap_batch_upgrade_with_existing_text_attributes(self):
+        path, content = self.prepare_bootstrap_attributes_upgrade()
+        self.helper("update")
+        self.assertEqual((self.package / path).read_bytes(), content)
+        self.assertEqual(self.git(self.package, "diff", "HEAD", "--name-only"), b"")
+
+    def prepare_bootstrap_attributes_upgrade(self):
+        path = "scripts/portable/templates/Update-Next-Trainer.bat"
+        self.incoming(path, b"@echo off\necho old\n")
+        self.helper("update")
+        self.write(
+            self.source, ".gitattributes",
+            b"*.bat text eol=crlf\n" + path.encode() + b" -text\n",
+        )
+        content = b"@echo off\r\necho new\r\n"
+        self.incoming(path, content)
+        self.write(self.package, path, content)
+        return path, content
+
+    def test_failed_bootstrap_upgrade_restores_attributes_and_index(self):
+        path, content = self.prepare_bootstrap_attributes_upgrade()
+        self.incoming()
+        self.write(self.package, "gui.py", b"user edit\n")
+        attributes = (self.package / ".gitattributes").read_bytes()
+        index = self.git(self.package, "ls-files", "--stage")
+        self.assertNotEqual(self.helper("update", ok=False).returncode, 0)
+        self.assertEqual((self.package / ".gitattributes").read_bytes(), attributes)
+        self.assertEqual(self.git(self.package, "ls-files", "--stage"), index)
+        self.assertEqual((self.package / path).read_bytes(), content)
+        self.assertEqual((self.package / "gui.py").read_bytes(), b"user edit\n")
+
+    def test_bootstrap_upgrade_preserves_user_attributes(self):
+        self.prepare_bootstrap_attributes_upgrade()
+        attributes = b"*.bat text eol=crlf\n# user setting\n"
+        self.write(self.package, ".gitattributes", attributes)
+        self.assertNotEqual(self.helper("update", ok=False).returncode, 0)
+        self.assertEqual((self.package / ".gitattributes").read_bytes(), attributes)
+
     def test_missing_program_path_blocked_by_user_file_is_preserved(self):
         (self.package / "docs/guide.md").unlink()
         (self.package / "docs").rmdir()
@@ -396,7 +434,10 @@ class PortableGitBehavior(unittest.TestCase):
         self.commit("batch update")
         launcher = self.root / "Update-Next-Trainer.bat"
         path = "build-scripts/templates/Update-Next-Trainer.bat"
-        payload = self.git(ROOT, "show", f"HEAD:{path}") if raw_download else (ROOT / path).read_bytes()
+        payload = (
+            self.git(ROOT, "show", f"HEAD:{path}")
+            if raw_download else (ROOT / path).read_bytes()
+        )
         launcher.write_bytes(payload)
         self.run_cmd(
             "cmd",

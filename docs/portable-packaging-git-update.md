@@ -248,6 +248,14 @@ fast-forward update failed
 
 因此浅克隆场景必须使用 `git fetch --deepen=50`，先补齐一段历史，再执行 `git merge --ff-only`。
 
+完整仓库使用普通 `git fetch`，不得加 `--depth=1`，否则新提交也会被截成浅边界，正常后继提交无法通过祖先检查。
+
+### 在线引导的批处理换行
+
+旧引导器直接保存 GitHub raw 文件再调用 `cmd.exe`，不会经过 Git checkout 的换行转换。
+因此下载清单中的 `.bat` 文件必须在 Git blob 内就保持无 BOM 的 CRLF；仅设置 `eol=crlf` 不足以保证在线下载可执行。
+`.gitattributes` 对这些文件单独禁用文本归一化，回归测试同时检查原始 blob 并通过 Windows cmd 执行。
+
 ## 首次依赖安装测速
 
 `setup_environment.py` 不应只测试镜像首字节延迟。PyTorch wheel 约 3 GB，首响应快不代表大文件下载快。

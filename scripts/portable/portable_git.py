@@ -129,7 +129,26 @@ def update(root):
     # Bootstrap downloads tracked scripts before the merge. Stage only files
     # already identical to the fetched commit, with no pre-existing staged edit.
     staged = []
+    attributes_backup = None
+    merged = False
     try:
+        # Raw bootstrap BATs must match target CRLF blobs even when the old
+        # attributes still normalize them to LF. Adopt only an untouched
+        # attributes file, and roll it back if the merge cannot finish.
+        attributes = root / ".gitattributes"
+        entry = git(root, "ls-tree", target, "--", ".gitattributes").split()
+        if (
+            attributes.is_file()
+            and not attributes.is_symlink()
+            and len(entry) == 4
+            and entry[0] in (b"100644", b"100755")
+            and git(root, "ls-files", "--", ".gitattributes")
+            and not git(root, "diff", "HEAD", "--name-only", "--", ".gitattributes")
+            and not git(root, "diff", "--cached", "--name-only", "--", ".gitattributes")
+            and git(root, "diff", "HEAD", target, "--name-only", "--", ".gitattributes")
+        ):
+            attributes_backup = attributes.read_bytes()
+            git(root, "restore", f"--source={target}", "--worktree", "--", ".gitattributes")
         for path in BOOTSTRAP_FILES:
             if git(root, "diff", "--cached", "--name-only", "--", path):
                 continue
@@ -169,11 +188,14 @@ def update(root):
             ],
             check=True,
         )
+        merged = True
     finally:
         if staged:
             # On failure restore the original index; on success HEAD contains
             # exactly these files. Neither case writes to the working tree.
             git(root, "restore", "--staged", "--source=HEAD", "--", *staged)
+        if attributes_backup is not None and not merged:
+            attributes.write_bytes(attributes_backup)
 
     # Merge materializes changed files itself. Fill only paths still missing
     # from the new checkout, excluding files removed by the update.
