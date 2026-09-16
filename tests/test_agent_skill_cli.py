@@ -271,6 +271,79 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertFalse(json.loads(out.getvalue())["stopped"])
 
+    def test_stop_rejects_remote_base_url(self):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = nt.main(["--base-url", "http://192.0.2.10:28000", "stop"])
+        self.assertEqual(code, 1)
+        self.assertIn("只能操作本机", json.loads(err.getvalue())["error"])
+
+    def test_start_rejects_remote_base_url(self):
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = nt.main(["--base-url", "http://192.0.2.10:28000", "start"])
+        self.assertEqual(code, 1)
+        self.assertIn("只能操作本机", json.loads(err.getvalue())["error"])
+
+    def test_search_max_matches_caps_doc_hits(self):
+        self.routes[("GET", "/api/schemas/all")] = (200, {
+            "status": "success",
+            "data": {"schemas": [{"name": "p1", "schema": "learning_rate: Schema.number()"}]},
+        })
+        code, out, _ = self.run_cli("search", "lora", "--max-matches", "2")
+        self.assertEqual(code, 0)
+        data = json.loads(out)
+        self.assertLessEqual(len(data["docs"]), 2)
+        self.assertLessEqual(len(data["schema_params"]), 2)
+
+    def test_search_indexes_repo_docs_with_labels(self):
+        self.routes[("GET", "/api/schemas/all")] = (200, {
+            "status": "success",
+            "data": {"schemas": [{"name": "p1", "schema": "x: Schema.number()"}]},
+        })
+        code, out, _ = self.run_cli("search", "tensorboard", "--max-matches", "50")
+        self.assertEqual(code, 0)
+        files = {h["file"] for h in json.loads(out)["docs"]}
+        self.assertTrue(any(f.startswith("docs/") for f in files), files)
+
+    def test_gpu_ids_triggers_client_warning(self):
+        warnings = nt.check_config_warnings({"model_train_type": "sd-lora", "gpu_ids": [0]})
+        self.assertTrue(any("gpu_ids" in w for w in warnings))
+        self.assertEqual(nt.check_config_warnings({"model_train_type": "sd-lora"}), [])
+
+    def test_submit_blocks_on_gpu_ids_warning(self):
+        self.routes[("GET", "/api/tasks")] = (200, {"status": "success", "data": {"tasks": []}})
+        code, _out, err = self.run_cli(
+            "submit", '{"model_train_type": "sd-lora", "gpu_ids": [0]}'
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("gpu_ids", json.loads(err)["error"])
+        self.assertEqual(self.posts, [])
+
+
+class SchemaDriftGuardTests(unittest.TestCase):
+    """Parser must keep up with the real schema sources (drift guard)."""
+
+    SCHEMA_DIR = Path(__file__).resolve().parents[1] / "mikazuki" / "schema"
+
+    def test_extracts_duration_mode_from_anima_fast_schema(self):
+        text = (self.SCHEMA_DIR / "anima-lora-fast.ts").read_text(encoding="utf-8")
+        parsed = nt.extract_schema_fields(text)
+        fields = {}
+        for f in parsed:  # 同名条件分支行会重复出现，保留信息最全的一条
+            if f["name"] not in fields or len(f) > len(fields[f["name"]]):
+                fields[f["name"]] = f
+        self.assertIn("training_duration_mode", fields)
+        self.assertEqual(fields["training_duration_mode"].get("choices"), ["epoch", "steps"])
+        self.assertIn("max_train_epochs", fields)
+        self.assertIn("max_train_steps", fields)
+        self.assertIn("network_train_unet_only", fields)
+
+    def test_extracts_fields_from_shared_schema(self):
+        text = (self.SCHEMA_DIR / "shared.ts").read_text(encoding="utf-8")
+        fields = {f["name"]: f for f in nt.extract_schema_fields(text)}
+        self.assertIn("learning_rate", fields)
+
 
 if __name__ == "__main__":
     unittest.main()
