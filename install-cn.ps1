@@ -110,6 +110,30 @@ function Get-PipSourceArgs {
     return @("--index-url", $Source.Url)
 }
 
+function Get-PipResumeRetriesArgs {
+    # --resume-retries needs pip >= 23.1. A venv created by python 3.10's
+    # ensurepip ships pip 23.0.1, which rejects the option during argument
+    # parsing (exit 2, before any network access), so every install attempt
+    # fails identically no matter the mirror. Probe instead of assuming.
+    if ($null -ne $script:PipResumeRetriesArgs) {
+        return $script:PipResumeRetriesArgs
+    }
+    $script:PipResumeRetriesArgs = @()
+    # No `Select-Object -First 1` here: it stops the upstream pipeline, which
+    # leaves $LASTEXITCODE at -1 and makes the probe look like a failure.
+    $pipVersion = (python -m pip --version 2>$null) -join ' '
+    if ($LASTEXITCODE -eq 0 -and $pipVersion -match 'pip\s+(\d+)\.(\d+)') {
+        $major = [int]$Matches[1]
+        $minor = [int]$Matches[2]
+        if ($major -gt 23 -or ($major -eq 23 -and $minor -ge 1)) {
+            $script:PipResumeRetriesArgs = @("--resume-retries", "5")
+        } else {
+            Write-Host ("检测到 pip {0}.{1}，不支持 --resume-retries，已跳过该参数。" -f $major, $minor)
+        }
+    }
+    return $script:PipResumeRetriesArgs
+}
+
 function Invoke-PipInstallWithRetries {
     param (
         [string]$Label,
@@ -118,19 +142,49 @@ function Invoke-PipInstallWithRetries {
         [int]$RetriesPerSource
     )
 
+    # Everything this function emits must go to the host, never to its output
+    # stream: PowerShell returns the whole stream, so a single stray line turns
+    # `return $false` into @(line, $false) -- a non-empty array, which is truthy.
+    # That is how `if (-not (Invoke-PipInstallWithRetries ...))` stopped firing
+    # and a run where all 15 pip attempts failed still printed "安装完成",
+    # exited 0 and left the user an empty venv.
+    # Two separate sources pollute it, and both have to be handled:
+    #   - Write-Output for the retry notice (use Write-Host)
+    #   - pip's own stdout, because a native command's stdout is the output
+    #     stream too (pipe it to Out-Host)
     $sourceArgs = Get-PipSourceArgs $Source
+    $resumeArgs = @(Get-PipResumeRetriesArgs)
+    $installed = $false
     for ($attempt = 1; $attempt -le $RetriesPerSource; $attempt++) {
         if ($attempt -gt 1) {
-            Write-Output ("{0} 网络波动，继续使用当前源重试 ({1}/{2}): {3}" -f $Label, $attempt, $RetriesPerSource, $Source.Name)
+            Write-Host ("{0} 网络波动，继续使用当前源重试 ({1}/{2}): {3}" -f $Label, $attempt, $RetriesPerSource, $Source.Name)
         }
 
-        python -m pip install --retries 5 --timeout 60 --resume-retries 5 @PackageArgs @sourceArgs
+        python -m pip install --retries 5 --timeout 60 @resumeArgs @PackageArgs @sourceArgs | Out-Host
         if ($LASTEXITCODE -eq 0) {
-            return $true
+            $installed = $true
+            break
         }
     }
 
-    return $false
+    return $installed
+}
+
+function Install-PipUpgrade {
+    # An explicit lower bound is required: a bare `--upgrade pip` resolves to
+    # "Requirement already satisfied" and silently no-ops whenever the configured
+    # mirror's index does not expose a newer pip.
+    Write-Output "升级 venv 内的 pip (>=23.1)..."
+    python -m pip install --upgrade "pip>=23.1" 2>&1 | Write-Host
+    if ($LASTEXITCODE -eq 0) { return }
+
+    Write-Host "镜像源升级 pip 失败，回退官方源 pypi.org 重试..."
+    python -m pip install --upgrade "pip>=23.1" -i https://pypi.org/simple 2>&1 | Write-Host
+    if ($LASTEXITCODE -eq 0) { return }
+
+    Write-Output "警告: pip 升级失败，将以当前 pip 版本继续安装。"
+    Write-Output "      若后续安装报 'no such option'，请手动执行:"
+    Write-Output "      venv\Scripts\python.exe -m pip install --upgrade `"pip>=23.1`" -i https://mirrors.aliyun.com/pypi/simple/"
 }
 
 function Test-PythonModuleAvailable {
@@ -172,6 +226,8 @@ else {
     .\venv\Scripts\activate
     Check "激活虚拟环境失败。"
 }
+
+Install-PipUpgrade
 
 Write-Output "安装训练依赖 (已进行国内加速，如在国外无法使用加速源请换用 install.ps1 脚本)"
 Write-Output "Torch 将自动测速多个下载源并选择最快可用源。"
@@ -242,6 +298,17 @@ Write-Output "预下载默认 WD 打标模型 wd14-convnextv2-v2（约 388MB，�
 python scripts/prefetch_default_tagger.py --if-missing --tagger-models-dir "$Env:MIKAZUKI_TAGGER_MODELS_DIR"
 if ($LASTEXITCODE -ne 0) {
     Write-Output "警告: 默认打标模型预下载失败，可在启动后于「打标」页首次使用时自动下载。"
+}
+
+# Final truth check. Every step above reports its own success, but this is what
+# the user actually needs: an importable torch. Without it the WebUI starts and
+# then dies at the first import with no indication that install was the problem.
+Write-Output "校验安装结果..."
+python -c "import torch; print('torch', torch.__version__)"
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "安装校验失败: venv 内无法 import torch。"
+    Write-Output "请向上翻查看 pip 报错，或删除 venv 文件夹后重新运行本脚本。"
+    InstallFail
 }
 
 Write-Output "安装完成"
