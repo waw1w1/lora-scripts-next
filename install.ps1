@@ -29,17 +29,31 @@ if (!(Test-Path -Path "venv")) {
 
 Write-Output "Installing deps..."
 
-pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+# Always `python -m pip`, never bare `pip`. If `pip` is not resolvable (a venv
+# created by uv has no pip shim, or PATH is odd) PowerShell raises a command-not-
+# found error without touching $LASTEXITCODE, so the checks below would still see
+# the 0 left by `python -m venv` and report "Install completed" over an empty venv.
+python -m pip install --upgrade "pip>=23.1"
+if ($LASTEXITCODE -ne 0) { Write-Output "pip upgrade failed. Check your network and retry."; InstallFail }
+python -m pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 if ($LASTEXITCODE -ne 0) { Write-Output "torch install failed. Delete venv and retry."; InstallFail }
-pip install -U -I --no-deps xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
+python -m pip install -U -I --no-deps xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
 if ($LASTEXITCODE -ne 0) { Write-Output "xformers install failed."; InstallFail }
-pip install --upgrade -r requirements.txt
+python -m pip install --upgrade -r requirements.txt
 if ($LASTEXITCODE -ne 0) { Write-Output "requirements install failed."; InstallFail }
 
 Write-Output "Prefetching default WD tagger wd14-convnextv2-v2 (~388 MB)..."
 python scripts/prefetch_default_tagger.py --if-missing --no-mirror
 if ($LASTEXITCODE -ne 0) {
     Write-Output "Warning: default tagger prefetch failed; it will download on first tag run."
+}
+
+Write-Output "Verifying the install..."
+python -c "import torch; print('torch', torch.__version__)"
+if ($LASTEXITCODE -ne 0) {
+    Write-Output "Verification failed: cannot import torch inside venv."
+    Write-Output "Scroll up for the pip error, or delete the venv folder and retry."
+    InstallFail
 }
 
 Write-Output "Install completed"
