@@ -14,6 +14,7 @@ from mikazuki.datasets.root import (
 )
 from mikazuki.datasets.sandbox import resolve_dataset_dir
 from mikazuki.datasets.stats import cached_overview, get_overview, invalidate_overview
+from mikazuki.datasets.trash import empty_trash, list_trash, restore_batch, soft_delete
 from mikazuki.datasets.upload import (
     MAX_BATCH_BYTES,
     cleanup_staging,
@@ -40,6 +41,19 @@ class DatasetCreateRequest(BaseModel):
 
 class UploadCheckRequest(BaseModel):
     paths: list[str]
+
+
+class DeleteFilesRequest(BaseModel):
+    paths: list[str]
+
+
+class TrashRestoreRequest(BaseModel):
+    id: str
+
+
+class TrashEmptyRequest(BaseModel):
+    id: str | None = None
+    confirm: bool = False
 
 
 def root_payload() -> dict:
@@ -118,6 +132,47 @@ async def create(req: DatasetCreateRequest):
         raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
     invalidate_overview(dataset_dir)
     return APIResponseSuccess(data={"name": dataset_dir.name, "path": normalize_path(dataset_dir)})
+
+
+def existing_dataset_dir(name: str) -> Path:
+    dataset_dir = resolve_dataset_dir(get_datasets_root(), name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return dataset_dir
+
+
+@router.get("/datasets/{name}/trash")
+async def trash_list(name: str):
+    dataset_dir = existing_dataset_dir(name)
+    return APIResponseSuccess(data={"dataset": dataset_dir.name, "batches": list_trash(get_datasets_root(), dataset_dir.name)})
+
+
+@router.post("/datasets/{name}/trash/restore")
+async def trash_restore(name: str, req: TrashRestoreRequest):
+    dataset_dir = existing_dataset_dir(name)
+    result = restore_batch(get_datasets_root(), dataset_dir, req.id)
+    if result["restored"]:
+        invalidate_overview(dataset_dir)
+    return APIResponseSuccess(data=result)
+
+
+@router.post("/datasets/{name}/trash/empty")
+async def trash_empty(name: str, req: TrashEmptyRequest):
+    dataset_dir = existing_dataset_dir(name)
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="emptying the trash requires confirm=true")
+    return APIResponseSuccess(data=empty_trash(get_datasets_root(), dataset_dir.name, req.id))
+
+
+@router.delete("/datasets/{name}/files")
+async def delete_files(name: str, req: DeleteFilesRequest):
+    dataset_dir = existing_dataset_dir(name)
+    if not req.paths:
+        raise HTTPException(status_code=400, detail="no paths given")
+    result = soft_delete(get_datasets_root(), dataset_dir, req.paths)
+    if result["deleted"]:
+        invalidate_overview(dataset_dir)
+    return APIResponseSuccess(data=result)
 
 
 @router.post("/datasets/{name}/upload/check")
