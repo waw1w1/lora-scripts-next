@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from mikazuki.app.models import APIResponseSuccess
+from mikazuki.datasets.export import file_download_response, stream_dataset_zip
 from mikazuki.datasets.listing import list_datasets
 from mikazuki.datasets.root import (
     DEFAULT_DATASETS_ROOT,
@@ -87,6 +88,22 @@ async def overview(name: str):
     if not dataset_dir.is_dir():
         raise HTTPException(status_code=404, detail="dataset not found")
     return APIResponseSuccess(data={"name": dataset_dir.name, "overview": get_overview(dataset_dir)})
+
+
+@router.get("/datasets/{name}/file")
+async def download_file(name: str, path: str):
+    dataset_dir = resolve_dataset_dir(get_datasets_root(), name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return file_download_response(dataset_dir, path)
+
+
+@router.get("/datasets/{name}/download")
+async def download_dataset(name: str):
+    dataset_dir = resolve_dataset_dir(get_datasets_root(), name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return stream_dataset_zip(dataset_dir)
 
 
 @router.post("/datasets")
