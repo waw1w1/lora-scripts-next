@@ -213,6 +213,8 @@ export default {
     upload: "Upload",
     downloadZip: "Download ZIP",
     trash: "Trash",
+    deleteDataset: "Delete",
+    confirmDelete: "All contents of dataset \"{name}\" will be moved to the trash and can be restored. Continue?",
     rootDialogTitle: "Datasets root",
     rootDialogPlaceholder: "./datasets or an absolute server path",
     rootDialogHint: "Relative paths resolve against the application directory. Switching the root never moves or deletes existing data.",
@@ -227,6 +229,8 @@ export default {
       rootSaveFail: "Failed to update root",
       created: "Dataset created",
       createFail: "Failed to create dataset",
+      deleted: "Moved to trash ({n} files)",
+      deleteFail: "Failed to delete dataset",
     },
   },
   datasetUpload: {
@@ -250,6 +254,7 @@ export default {
   },
   datasetTrash: {
     title: "Trash · {name}",
+    titleGlobal: "Trash",
     empty: "Trash is empty",
     batchInfo: "{count} file(s) · {time}",
     restore: "Restore",

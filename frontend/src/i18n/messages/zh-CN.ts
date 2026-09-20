@@ -213,6 +213,8 @@ export default {
     upload: "上传",
     downloadZip: "下载 ZIP",
     trash: "回收站",
+    deleteDataset: "删除",
+    confirmDelete: "将把数据集「{name}」的全部内容移入回收站，可从回收站恢复。是否继续？",
     rootDialogTitle: "数据集根目录",
     rootDialogPlaceholder: "./datasets 或服务器绝对路径",
     rootDialogHint: "相对路径以应用目录为基准解析；切换根目录不会搬迁或删除原有数据。",
@@ -227,6 +229,8 @@ export default {
       rootSaveFail: "根目录设置失败",
       created: "数据集已创建",
       createFail: "创建数据集失败",
+      deleted: "已移入回收站（{n} 个文件）",
+      deleteFail: "删除数据集失败",
     },
   },
   datasetUpload: {
@@ -250,6 +254,7 @@ export default {
   },
   datasetTrash: {
     title: "回收站 · {name}",
+    titleGlobal: "回收站",
     empty: "回收站为空",
     batchInfo: "{count} 个文件 · {time}",
     restore: "恢复",

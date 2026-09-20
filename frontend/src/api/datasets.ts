@@ -17,7 +17,7 @@ export interface UploadFileItem { file: File; path: string }
 export interface UploadFailure { path: string; reason: string }
 export interface UploadResult { dataset: string; succeeded: string[]; skipped: string[]; failed: UploadFailure[] }
 export interface UploadCheck { conflicts: string[]; invalid: UploadFailure[]; ok: number }
-export interface TrashBatch { id: string; deleted_at: string | null; count: number; paths: string[] }
+export interface TrashBatch { id: string; dataset: string; deleted_at: string | null; count: number; paths: string[] }
 export interface DeleteResult { batch: string | null; deleted: string[]; missing: string[] }
 export interface RestoreResult { restored: string[]; conflicts: string[]; missing: string[] }
 
@@ -35,11 +35,16 @@ export const datasetsApi = {
     apiData<UploadCheck>(`/api/datasets/${encodeURIComponent(name)}/upload/check`, { method: "POST", body: JSON.stringify({ paths }) }),
   deleteFiles: (name: string, paths: string[]) =>
     apiData<DeleteResult>(`/api/datasets/${encodeURIComponent(name)}/files`, { method: "DELETE", body: JSON.stringify({ paths }) }),
+  deleteDataset: (name: string) => apiData<DeleteResult>(`/api/datasets/${encodeURIComponent(name)}`, { method: "DELETE" }),
   trash: (name: string) => apiData<{ dataset: string; batches: TrashBatch[] }>(`/api/datasets/${encodeURIComponent(name)}/trash`),
+  trashAll: () => apiData<{ batches: TrashBatch[] }>("/api/datasets-trash"),
   restoreTrash: (name: string, id: string) =>
     apiData<RestoreResult>(`/api/datasets/${encodeURIComponent(name)}/trash/restore`, { method: "POST", body: JSON.stringify({ id }) }),
+  restoreTrashAny: (id: string) => apiData<RestoreResult>("/api/datasets-trash/restore", { method: "POST", body: JSON.stringify({ id }) }),
   emptyTrash: (name: string, id?: string) =>
     apiData<{ removed: number }>(`/api/datasets/${encodeURIComponent(name)}/trash/empty`, { method: "POST", body: JSON.stringify({ id: id ?? null, confirm: true }) }),
+  emptyTrashAny: (id?: string) =>
+    apiData<{ removed: number }>("/api/datasets-trash/empty", { method: "POST", body: JSON.stringify({ id: id ?? null, confirm: true }) }),
   upload(name: string, files: UploadFileItem[], conflict: "skip" | "overwrite", onProgress?: (percent: number) => void): Promise<UploadResult> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()
