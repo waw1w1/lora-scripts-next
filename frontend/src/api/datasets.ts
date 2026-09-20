@@ -13,6 +13,10 @@ export interface DatasetOverview {
 export interface DatasetEntry { name: string; path: string; overview: DatasetOverview | null }
 export interface DatasetList { root: string; exists: boolean; datasets: DatasetEntry[] }
 export interface DatasetCreated { name: string; path: string }
+export interface UploadFileItem { file: File; path: string }
+export interface UploadFailure { path: string; reason: string }
+export interface UploadResult { dataset: string; succeeded: string[]; skipped: string[]; failed: UploadFailure[] }
+export interface UploadCheck { conflicts: string[]; invalid: UploadFailure[]; ok: number }
 
 export const datasetsApi = {
   getRoot: () => apiData<DatasetsRoot>("/api/datasets/root"),
@@ -20,4 +24,33 @@ export const datasetsApi = {
   list: () => apiData<DatasetList>("/api/datasets"),
   create: (name: string) => apiData<DatasetCreated>("/api/datasets", { method: "POST", body: JSON.stringify({ name }) }),
   overview: (name: string) => apiData<{ name: string; overview: DatasetOverview }>(`/api/datasets/${encodeURIComponent(name)}/overview`),
+  checkUpload: (name: string, paths: string[]) =>
+    apiData<UploadCheck>(`/api/datasets/${encodeURIComponent(name)}/upload/check`, { method: "POST", body: JSON.stringify({ paths }) }),
+  upload(name: string, files: UploadFileItem[], conflict: "skip" | "overwrite", onProgress?: (percent: number) => void): Promise<UploadResult> {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("POST", `/api/datasets/${encodeURIComponent(name)}/upload`)
+      if (onProgress) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      }
+      xhr.onload = () => {
+        let payload: { status?: string; data?: UploadResult; detail?: string; message?: string } = {}
+        try {
+          payload = JSON.parse(xhr.responseText)
+        } catch {
+          reject(new Error(`HTTP ${xhr.status}`))
+          return
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && payload.status === "success" && payload.data) resolve(payload.data)
+        else reject(new Error(payload.detail || payload.message || `HTTP ${xhr.status}`))
+      }
+      xhr.onerror = () => reject(new Error("network error"))
+      const form = new FormData()
+      form.append("conflict", conflict)
+      for (const item of files) form.append("files", item.file, item.path)
+      xhr.send(form)
+    })
+  },
 }
