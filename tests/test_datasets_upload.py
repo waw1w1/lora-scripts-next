@@ -139,3 +139,38 @@ def test_upload_requires_files(dataset):
     client = TestClient(app)
     response = client.post("/api/datasets/ds/upload", data={"conflict": "skip"})
     assert response.status_code == 400
+
+
+def test_upload_check_classifies_conflicts_and_invalid(dataset):
+    (dataset / "sub").mkdir()
+    (dataset / "exists.png").write_bytes(b"x")
+    (dataset / "sub").joinpath("taken.txt").write_text("y", encoding="utf-8")
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/datasets/ds/upload/check",
+        json={"paths": ["exists.png", "sub/taken.txt", "new.png", "deep/nested/c.jpg", "bad.exe", "../escape.png"]},
+    )
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert sorted(data["conflicts"]) == ["exists.png", "sub/taken.txt"]
+    assert data["ok"] == 2
+    assert len(data["invalid"]) == 2
+
+
+def test_upload_check_missing_dataset_404(tmp_path, monkeypatch):
+    root = tmp_path / "datasets"
+    root.mkdir(parents=True)
+    monkeypatch.setitem(app_config._stored, "datasets_root", str(root))
+    monkeypatch.setattr(app_config, "save_config", lambda: None)
+
+    client = TestClient(app)
+    response = client.post("/api/datasets/ghost/upload/check", json={"paths": ["a.png"]})
+    assert response.status_code == 404
+
+
+def test_upload_rejects_bad_conflict_mode(dataset):
+    client = TestClient(app)
+    response = post_files(client, "ds", [("a.png", png_bytes())], conflict="rename")
+    assert response.status_code == 400
