@@ -195,6 +195,7 @@ export default {
     rootLabel: "数据集根目录",
     rootMissing: "目录不存在",
     refresh: "刷新",
+    autoRefresh: "自动刷新",
     rootSettings: "根目录设置",
     create: "新建数据集",
     empty: "根目录下还没有数据集，点击“新建数据集”或把现有文件夹放入根目录即可自动发现。",

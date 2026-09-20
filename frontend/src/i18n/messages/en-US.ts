@@ -195,6 +195,7 @@ export default {
     rootLabel: "Datasets root",
     rootMissing: "Directory missing",
     refresh: "Refresh",
+    autoRefresh: "Auto-refresh",
     rootSettings: "Root settings",
     create: "New dataset",
     empty: "No datasets under the root yet. Create one, or drop an existing folder into the root and it will be discovered automatically.",

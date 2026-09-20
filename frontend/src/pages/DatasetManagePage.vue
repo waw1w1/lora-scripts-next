@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onActivated, onBeforeUnmount, onDeactivated, ref } from "vue"
+import { onActivated, onBeforeUnmount, onDeactivated, ref, watch } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
@@ -9,6 +9,7 @@ import DatasetUploadDialog from "../components/dataset/DatasetUploadDialog.vue"
 
 const POLL_INTERVAL_MS = 1500
 const READY_REFRESH_MS = 15000
+const AUTO_REFRESH_KEY = "dataset-manage-auto-refresh"
 
 const { t } = useI18n()
 const router = useRouter()
@@ -26,6 +27,7 @@ const createName = ref("")
 const creating = ref(false)
 const uploadTarget = ref("")
 const trashOpen = ref(false)
+const autoRefresh = ref(localStorage.getItem(AUTO_REFRESH_KEY) === "1")
 let timer: number | undefined
 
 function formatBytes(bytes: number | null | undefined) {
@@ -67,6 +69,10 @@ function needsPoll(entry: DatasetEntry) {
   return Date.now() - computedAt > READY_REFRESH_MS
 }
 
+function hasUnsettled() {
+  return datasets.value.some((entry) => !entry.overview || entry.overview.state === "computing")
+}
+
 async function pollOverviews() {
   const pending = datasets.value.filter(needsPoll)
   if (!pending.length) return
@@ -80,12 +86,24 @@ async function pollOverviews() {
       }
     }),
   )
+  if (!autoRefresh.value && !hasUnsettled()) stopPolling()
 }
 
 function stopPolling() {
   window.clearInterval(timer)
   timer = undefined
 }
+
+function ensurePolling() {
+  if (timer !== undefined) return
+  timer = window.setInterval(() => void pollOverviews(), POLL_INTERVAL_MS)
+}
+
+watch(autoRefresh, (enabled) => {
+  localStorage.setItem(AUTO_REFRESH_KEY, enabled ? "1" : "0")
+  if (enabled) ensurePolling()
+  else if (!hasUnsettled()) stopPolling()
+})
 
 async function load(silent = false) {
   if (silent) refreshing.value = true
@@ -96,6 +114,7 @@ async function load(silent = false) {
     rootExists.value = data.exists
     datasets.value = data.datasets
     void pollOverviews()
+    if (autoRefresh.value || hasUnsettled()) ensurePolling()
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : t("datasetManage.msg.loadFail"))
   } finally {
@@ -172,8 +191,6 @@ function onUploaded() {
 
 onActivated(() => {
   void load()
-  stopPolling()
-  timer = window.setInterval(() => void pollOverviews(), POLL_INTERVAL_MS)
 })
 onDeactivated(stopPolling)
 onBeforeUnmount(stopPolling)
@@ -188,6 +205,10 @@ onBeforeUnmount(stopPolling)
         <span v-if="!rootExists" class="dataset-manage-root-missing">{{ t("datasetManage.rootMissing") }}</span>
       </div>
       <div class="dataset-manage-actions">
+        <label class="dataset-manage-autorefresh">
+          <ElSwitch v-model="autoRefresh" />
+          <span>{{ t("datasetManage.autoRefresh") }}</span>
+        </label>
         <button class="secondary-action" :disabled="loading || refreshing" @click="load(true)">{{ t("datasetManage.refresh") }}</button>
         <button class="secondary-action" @click="openRootDialog">{{ t("datasetManage.rootSettings") }}</button>
         <button class="secondary-action" @click="trashOpen = true">{{ t("datasetManage.trash") }}</button>
