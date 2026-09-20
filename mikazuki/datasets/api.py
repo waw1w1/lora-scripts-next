@@ -1,5 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from pathlib import Path
 from pydantic import BaseModel
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from mikazuki.app.models import APIResponseSuccess
 from mikazuki.datasets.listing import list_datasets
@@ -11,6 +13,18 @@ from mikazuki.datasets.root import (
 )
 from mikazuki.datasets.sandbox import resolve_dataset_dir
 from mikazuki.datasets.stats import cached_overview, get_overview, invalidate_overview
+from mikazuki.datasets.upload import (
+    MAX_BATCH_BYTES,
+    cleanup_staging,
+    ensure_capacity,
+    move_staged,
+    new_staging_dir,
+    relative_of,
+    resolve_upload_target,
+    sanitize_relative_path,
+    stage_upload,
+    validate_readable,
+)
 
 router = APIRouter()
 
@@ -83,3 +97,89 @@ async def create(req: DatasetCreateRequest):
         raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
     invalidate_overview(dataset_dir)
     return APIResponseSuccess(data={"name": dataset_dir.name, "path": normalize_path(dataset_dir)})
+
+
+@router.post("/datasets/{name}/upload")
+async def upload(name: str, request: Request):
+    root = get_datasets_root()
+    dataset_dir = resolve_dataset_dir(root, name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+
+    form = await request.form()
+    conflict = str(form.get("conflict", "skip"))
+    if conflict not in ("skip", "overwrite"):
+        raise HTTPException(status_code=400, detail="conflict must be 'skip' or 'overwrite'")
+    uploads = [item for item in form.getlist("files") if isinstance(item, StarletteUploadFile)]
+    if not uploads:
+        raise HTTPException(status_code=400, detail="no files uploaded")
+
+    succeeded: list[str] = []
+    skipped: list[str] = []
+    failed: list[dict] = []
+    staged_ok: list[tuple[str, Path, int]] = []
+    seen: set[str] = set()
+    total = 0
+    batch_full = False
+    staging = new_staging_dir(root)
+
+    try:
+        for item in uploads:
+            raw_name = item.filename or ""
+            try:
+                rel = sanitize_relative_path(raw_name)
+                resolve_upload_target(dataset_dir, rel)
+            except ValueError as exc:
+                failed.append({"path": raw_name, "reason": str(exc)})
+                continue
+            if rel in seen:
+                failed.append({"path": rel, "reason": "duplicate path in batch"})
+                continue
+            seen.add(rel)
+            if batch_full:
+                failed.append({"path": rel, "reason": "batch size limit exceeded"})
+                continue
+            try:
+                staged, written = await stage_upload(item, staging, rel)
+            except ValueError as exc:
+                failed.append({"path": rel, "reason": str(exc)})
+                continue
+            total += written
+            if total > MAX_BATCH_BYTES:
+                staged.unlink(missing_ok=True)
+                failed.append({"path": rel, "reason": "batch size limit exceeded"})
+                batch_full = True
+                continue
+            try:
+                validate_readable(staged)
+            except ValueError as exc:
+                staged.unlink(missing_ok=True)
+                failed.append({"path": rel, "reason": str(exc)})
+                continue
+            staged_ok.append((rel, staged, written))
+
+        moves: list[tuple[Path, Path]] = []
+        for rel, staged, _written in staged_ok:
+            target = resolve_upload_target(dataset_dir, rel)
+            moves.append((staged, target))
+
+        ensure_capacity(dataset_dir, moves)
+        overwrite = conflict == "overwrite"
+        for staged, target in moves:
+            if move_staged(staged, target, overwrite):
+                succeeded.append(relative_of(dataset_dir, target))
+            else:
+                skipped.append(relative_of(dataset_dir, target))
+    finally:
+        cleanup_staging(staging)
+
+    if succeeded:
+        invalidate_overview(dataset_dir)
+    return APIResponseSuccess(
+        data={
+            "dataset": dataset_dir.name,
+            "succeeded": succeeded,
+            "skipped": skipped,
+            "failed": failed,
+        }
+    )
