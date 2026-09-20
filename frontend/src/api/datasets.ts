@@ -17,6 +17,13 @@ export interface UploadFileItem { file: File; path: string }
 export interface UploadFailure { path: string; reason: string }
 export interface UploadResult { dataset: string; succeeded: string[]; skipped: string[]; failed: UploadFailure[] }
 export interface UploadCheck { conflicts: string[]; invalid: UploadFailure[]; ok: number }
+export interface TrashBatch { id: string; deleted_at: string | null; count: number; paths: string[] }
+export interface DeleteResult { batch: string | null; deleted: string[]; missing: string[] }
+export interface RestoreResult { restored: string[]; conflicts: string[]; missing: string[] }
+
+export const datasetFileUrl = (name: string, path: string) =>
+  `/api/datasets/${encodeURIComponent(name)}/file?path=${encodeURIComponent(path)}`
+export const datasetDownloadUrl = (name: string) => `/api/datasets/${encodeURIComponent(name)}/download`
 
 export const datasetsApi = {
   getRoot: () => apiData<DatasetsRoot>("/api/datasets/root"),
@@ -26,6 +33,13 @@ export const datasetsApi = {
   overview: (name: string) => apiData<{ name: string; overview: DatasetOverview }>(`/api/datasets/${encodeURIComponent(name)}/overview`),
   checkUpload: (name: string, paths: string[]) =>
     apiData<UploadCheck>(`/api/datasets/${encodeURIComponent(name)}/upload/check`, { method: "POST", body: JSON.stringify({ paths }) }),
+  deleteFiles: (name: string, paths: string[]) =>
+    apiData<DeleteResult>(`/api/datasets/${encodeURIComponent(name)}/files`, { method: "DELETE", body: JSON.stringify({ paths }) }),
+  trash: (name: string) => apiData<{ dataset: string; batches: TrashBatch[] }>(`/api/datasets/${encodeURIComponent(name)}/trash`),
+  restoreTrash: (name: string, id: string) =>
+    apiData<RestoreResult>(`/api/datasets/${encodeURIComponent(name)}/trash/restore`, { method: "POST", body: JSON.stringify({ id }) }),
+  emptyTrash: (name: string, id?: string) =>
+    apiData<{ removed: number }>(`/api/datasets/${encodeURIComponent(name)}/trash/empty`, { method: "POST", body: JSON.stringify({ id: id ?? null, confirm: true }) }),
   upload(name: string, files: UploadFileItem[], conflict: "skip" | "overwrite", onProgress?: (percent: number) => void): Promise<UploadResult> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest()

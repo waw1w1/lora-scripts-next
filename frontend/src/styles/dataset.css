@@ -1324,3 +1324,60 @@
 .upload-result .secondary-action {
   justify-self: start;
 }
+
+.caption-file-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.caption-file-actions a {
+  color: var(--accent, #2563eb);
+  text-decoration: none;
+}
+
+.caption-file-actions a:hover {
+  text-decoration: underline;
+}
+
+.trash-dialog {
+  display: grid;
+  gap: 12px;
+  min-height: 80px;
+}
+
+.trash-empty {
+  margin: 20px 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.trash-batch {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.trash-batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.trash-batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.trash-batch-paths {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  max-height: 140px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+}

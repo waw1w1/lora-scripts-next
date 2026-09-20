@@ -3,7 +3,8 @@ import { onActivated, onBeforeUnmount, onDeactivated, ref } from "vue"
 import { ElMessage } from "element-plus"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
-import { datasetsApi, type DatasetEntry, type DatasetOverview } from "../api/datasets"
+import { datasetDownloadUrl, datasetsApi, type DatasetEntry, type DatasetOverview } from "../api/datasets"
+import DatasetTrashDialog from "../components/dataset/DatasetTrashDialog.vue"
 import DatasetUploadDialog from "../components/dataset/DatasetUploadDialog.vue"
 
 const POLL_INTERVAL_MS = 1500
@@ -24,6 +25,7 @@ const createDialogOpen = ref(false)
 const createName = ref("")
 const creating = ref(false)
 const uploadTarget = ref("")
+const trashTarget = ref("")
 let timer: number | undefined
 
 function formatBytes(bytes: number | null | undefined) {
@@ -140,6 +142,10 @@ function openUpload(entry: DatasetEntry) {
   uploadTarget.value = entry.name
 }
 
+function openTrash(entry: DatasetEntry) {
+  trashTarget.value = entry.name
+}
+
 function onUploaded() {
   void load(true)
 }
@@ -190,6 +196,8 @@ onBeforeUnmount(stopPolling)
           <button class="primary-action" @click="openUpload(entry)">{{ t("datasetManage.upload") }}</button>
           <button class="secondary-action" @click="openTool('tagger', entry)">{{ t("datasetManage.openTagger") }}</button>
           <button class="secondary-action" @click="openTool('editor', entry)">{{ t("datasetManage.openEditor") }}</button>
+          <a class="secondary-action" :href="datasetDownloadUrl(entry.name)" download>{{ t("datasetManage.downloadZip") }}</a>
+          <button class="secondary-action" @click="openTrash(entry)">{{ t("datasetManage.trash") }}</button>
         </footer>
       </article>
     </section>
@@ -208,6 +216,13 @@ onBeforeUnmount(stopPolling)
       :dataset-name="uploadTarget"
       @update:model-value="uploadTarget = ''"
       @uploaded="onUploaded"
+    />
+
+    <DatasetTrashDialog
+      :model-value="!!trashTarget"
+      :dataset-name="trashTarget"
+      @update:model-value="trashTarget = ''"
+      @changed="onUploaded"
     />
 
     <ElDialog v-model="createDialogOpen" :title="t('datasetManage.createDialogTitle')" width="480px">
