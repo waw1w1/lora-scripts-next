@@ -10,6 +10,7 @@ from mikazuki.datasets.root import (
     set_datasets_root,
 )
 from mikazuki.datasets.sandbox import resolve_dataset_dir
+from mikazuki.datasets.stats import cached_overview, get_overview, invalidate_overview
 
 router = APIRouter()
 
@@ -50,13 +51,24 @@ async def update_root(req: RootUpdateRequest):
 @router.get("/datasets")
 async def list_all():
     root = get_datasets_root()
+    datasets = []
+    for item in list_datasets(root):
+        datasets.append({**item, "overview": cached_overview(root / item["name"])})
     return APIResponseSuccess(
         data={
             "root": normalize_path(root),
             "exists": root.is_dir(),
-            "datasets": list_datasets(root),
+            "datasets": datasets,
         }
     )
+
+
+@router.get("/datasets/{name}/overview")
+async def overview(name: str):
+    dataset_dir = resolve_dataset_dir(get_datasets_root(), name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+    return APIResponseSuccess(data={"name": dataset_dir.name, "overview": get_overview(dataset_dir)})
 
 
 @router.post("/datasets")
@@ -69,4 +81,5 @@ async def create(req: DatasetCreateRequest):
         dataset_dir.mkdir(parents=True)
     except OSError as exc:
         raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
+    invalidate_overview(dataset_dir)
     return APIResponseSuccess(data={"name": dataset_dir.name, "path": normalize_path(dataset_dir)})
