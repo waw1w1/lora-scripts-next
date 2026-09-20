@@ -1170,17 +1170,21 @@
 .dataset-card-stats dd {
   margin: 2px 0 0;
   font-size: 14px;
-}
-
-.dataset-card-pending {
-  grid-column: 1 / -1;
-  color: var(--text-faint);
-  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dataset-card-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.dataset-card-actions .primary-action,
+.dataset-card-actions .secondary-action {
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .dataset-manage-dialog-hint {

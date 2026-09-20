@@ -51,6 +51,15 @@ function overviewOf(entry: DatasetEntry): DatasetOverview | null {
   return entry.overview
 }
 
+function statValue(entry: DatasetEntry, field: "file_count" | "captioned_count" | "total_bytes" | "updated_at") {
+  const overview = overviewOf(entry)
+  if (!overview || overview.state !== "ready") return overview?.state === "error" ? "!" : "…"
+  const value = overview[field]
+  if (field === "total_bytes") return formatBytes(overview.total_bytes)
+  if (field === "updated_at") return formatTime(overview.updated_at)
+  return overview[field] ?? "-"
+}
+
 function needsPoll(entry: DatasetEntry) {
   const overview = entry.overview
   if (!overview || overview.state !== "ready") return true
@@ -183,14 +192,10 @@ onBeforeUnmount(stopPolling)
           <span class="dataset-card-path" :title="entry.path">{{ entry.path }}</span>
         </header>
         <dl class="dataset-card-stats">
-          <template v-if="overviewOf(entry)?.state === 'ready'">
-            <div><dt>{{ t("datasetManage.files") }}</dt><dd>{{ overviewOf(entry)?.file_count }}</dd></div>
-            <div><dt>{{ t("datasetManage.captioned") }}</dt><dd>{{ overviewOf(entry)?.captioned_count }}</dd></div>
-            <div><dt>{{ t("datasetManage.size") }}</dt><dd>{{ formatBytes(overviewOf(entry)?.total_bytes) }}</dd></div>
-            <div><dt>{{ t("datasetManage.updatedAt") }}</dt><dd>{{ formatTime(overviewOf(entry)?.updated_at) }}</dd></div>
-          </template>
-          <span v-else-if="overviewOf(entry)?.state === 'error'" class="dataset-card-pending">{{ t("datasetManage.statsError") }}</span>
-          <span v-else class="dataset-card-pending">{{ t("datasetManage.computing") }}</span>
+          <div><dt>{{ t("datasetManage.files") }}</dt><dd>{{ statValue(entry, "file_count") }}</dd></div>
+          <div><dt>{{ t("datasetManage.captioned") }}</dt><dd>{{ statValue(entry, "captioned_count") }}</dd></div>
+          <div><dt>{{ t("datasetManage.size") }}</dt><dd>{{ statValue(entry, "total_bytes") }}</dd></div>
+          <div><dt>{{ t("datasetManage.updatedAt") }}</dt><dd>{{ statValue(entry, "updated_at") }}</dd></div>
         </dl>
         <footer class="dataset-card-actions">
           <button class="primary-action" @click="openUpload(entry)">{{ t("datasetManage.upload") }}</button>
