@@ -842,8 +842,12 @@
 }
 
 .dataset-switch {
-  min-width: 260px;
+  min-width: 340px;
   justify-self: center;
+}
+
+.dataset-switch a {
+  white-space: nowrap;
 }
 
 .caption-editor {
