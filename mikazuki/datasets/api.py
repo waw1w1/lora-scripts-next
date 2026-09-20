@@ -37,6 +37,10 @@ class DatasetCreateRequest(BaseModel):
     name: str
 
 
+class UploadCheckRequest(BaseModel):
+    paths: list[str]
+
+
 def root_payload() -> dict:
     root = get_datasets_root()
     return {
@@ -97,6 +101,28 @@ async def create(req: DatasetCreateRequest):
         raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
     invalidate_overview(dataset_dir)
     return APIResponseSuccess(data={"name": dataset_dir.name, "path": normalize_path(dataset_dir)})
+
+
+@router.post("/datasets/{name}/upload/check")
+async def upload_check(name: str, req: UploadCheckRequest):
+    dataset_dir = resolve_dataset_dir(get_datasets_root(), name)
+    if not dataset_dir.is_dir():
+        raise HTTPException(status_code=404, detail="dataset not found")
+    conflicts: list[str] = []
+    invalid: list[dict] = []
+    ok = 0
+    for raw in req.paths:
+        try:
+            rel = sanitize_relative_path(raw)
+            target = resolve_upload_target(dataset_dir, rel)
+        except ValueError as exc:
+            invalid.append({"path": raw, "reason": str(exc)})
+            continue
+        if target.exists():
+            conflicts.append(rel)
+        else:
+            ok += 1
+    return APIResponseSuccess(data={"conflicts": conflicts, "invalid": invalid, "ok": ok})
 
 
 @router.post("/datasets/{name}/upload")
