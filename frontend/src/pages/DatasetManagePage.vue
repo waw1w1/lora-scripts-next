@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onActivated, onBeforeUnmount, onDeactivated, ref } from "vue"
-import { ElMessage } from "element-plus"
+import { ElMessage, ElMessageBox } from "element-plus"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
 import { datasetDownloadUrl, datasetsApi, type DatasetEntry, type DatasetOverview } from "../api/datasets"
@@ -25,7 +25,7 @@ const createDialogOpen = ref(false)
 const createName = ref("")
 const creating = ref(false)
 const uploadTarget = ref("")
-const trashTarget = ref("")
+const trashOpen = ref(false)
 let timer: number | undefined
 
 function formatBytes(bytes: number | null | undefined) {
@@ -151,8 +151,19 @@ function openUpload(entry: DatasetEntry) {
   uploadTarget.value = entry.name
 }
 
-function openTrash(entry: DatasetEntry) {
-  trashTarget.value = entry.name
+async function deleteDataset(entry: DatasetEntry) {
+  try {
+    await ElMessageBox.confirm(t("datasetManage.confirmDelete", { name: entry.name }), { type: "warning" })
+  } catch {
+    return
+  }
+  try {
+    const data = await datasetsApi.deleteDataset(entry.name)
+    ElMessage.success(t("datasetManage.msg.deleted", { n: data.deleted.length }))
+    await load(true)
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : t("datasetManage.msg.deleteFail"))
+  }
 }
 
 function onUploaded() {
@@ -179,6 +190,7 @@ onBeforeUnmount(stopPolling)
       <div class="dataset-manage-actions">
         <button class="secondary-action" :disabled="loading || refreshing" @click="load(true)">{{ t("datasetManage.refresh") }}</button>
         <button class="secondary-action" @click="openRootDialog">{{ t("datasetManage.rootSettings") }}</button>
+        <button class="secondary-action" @click="trashOpen = true">{{ t("datasetManage.trash") }}</button>
         <button class="primary-action" @click="createDialogOpen = true">{{ t("datasetManage.create") }}</button>
       </div>
     </section>
@@ -188,7 +200,14 @@ onBeforeUnmount(stopPolling)
     <section v-else class="dataset-manage-grid">
       <article v-for="entry in datasets" :key="entry.name" class="dataset-card">
         <header class="dataset-card-header">
-          <h2>{{ entry.name }}</h2>
+          <div class="dataset-card-title">
+            <h2>{{ entry.name }}</h2>
+            <button
+              class="danger-action dataset-card-delete"
+              :title="t('datasetManage.deleteDataset')"
+              @click="deleteDataset(entry)"
+            >{{ t("datasetManage.deleteDataset") }}</button>
+          </div>
           <span class="dataset-card-path" :title="entry.path">{{ entry.path }}</span>
         </header>
         <dl class="dataset-card-stats">
@@ -198,11 +217,14 @@ onBeforeUnmount(stopPolling)
           <div><dt>{{ t("datasetManage.updatedAt") }}</dt><dd>{{ statValue(entry, "updated_at") }}</dd></div>
         </dl>
         <footer class="dataset-card-actions">
-          <button class="primary-action" @click="openUpload(entry)">{{ t("datasetManage.upload") }}</button>
-          <button class="secondary-action" @click="openTool('tagger', entry)">{{ t("datasetManage.openTagger") }}</button>
-          <button class="secondary-action" @click="openTool('editor', entry)">{{ t("datasetManage.openEditor") }}</button>
-          <a class="secondary-action" :href="datasetDownloadUrl(entry.name)" download>{{ t("datasetManage.downloadZip") }}</a>
-          <button class="secondary-action" @click="openTrash(entry)">{{ t("datasetManage.trash") }}</button>
+          <div class="dataset-card-actions-row">
+            <button class="primary-action" @click="openUpload(entry)">{{ t("datasetManage.upload") }}</button>
+            <a class="secondary-action" :href="datasetDownloadUrl(entry.name)" download>{{ t("datasetManage.downloadZip") }}</a>
+          </div>
+          <div class="dataset-card-actions-row">
+            <button class="secondary-action" @click="openTool('tagger', entry)">{{ t("datasetManage.openTagger") }}</button>
+            <button class="secondary-action" @click="openTool('editor', entry)">{{ t("datasetManage.openEditor") }}</button>
+          </div>
         </footer>
       </article>
     </section>
@@ -224,9 +246,8 @@ onBeforeUnmount(stopPolling)
     />
 
     <DatasetTrashDialog
-      :model-value="!!trashTarget"
-      :dataset-name="trashTarget"
-      @update:model-value="trashTarget = ''"
+      :model-value="trashOpen"
+      @update:model-value="trashOpen = $event"
       @changed="onUploaded"
     />
 
