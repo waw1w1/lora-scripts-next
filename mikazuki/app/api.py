@@ -53,6 +53,7 @@ from mikazuki.app.models import (APIResponse, APIResponseFail,
                                  APIResponseSuccess, TaggerInterrogateRequest,
                                  TaggerPrefetchRequest)
 from mikazuki.dataset_editor import router as dataset_editor_router
+from mikazuki.datasets.api import router as datasets_router
 from mikazuki.plugin_marketplace.api import host_router as plugin_host_router
 from mikazuki.plugin_marketplace.api import router as plugin_marketplace_router
 from mikazuki.agent_workspace.api import router as agent_workspace_router
@@ -75,6 +76,7 @@ from mikazuki.utils.tk_window import (open_directory_selector,
 
 router = APIRouter()
 router.include_router(dataset_editor_router)
+router.include_router(datasets_router)
 router.include_router(plugin_marketplace_router)
 router.include_router(plugin_host_router)
 router.include_router(agent_workspace_router)
