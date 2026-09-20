@@ -4,6 +4,7 @@ import { ElMessage } from "element-plus"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
 import { datasetsApi, type DatasetEntry, type DatasetOverview } from "../api/datasets"
+import DatasetUploadDialog from "../components/dataset/DatasetUploadDialog.vue"
 
 const POLL_INTERVAL_MS = 1500
 const READY_REFRESH_MS = 15000
@@ -22,6 +23,7 @@ const rootSaving = ref(false)
 const createDialogOpen = ref(false)
 const createName = ref("")
 const creating = ref(false)
+const uploadTarget = ref("")
 let timer: number | undefined
 
 function formatBytes(bytes: number | null | undefined) {
@@ -134,6 +136,14 @@ function openTool(tool: "tagger" | "editor", entry: DatasetEntry) {
   void router.push({ path: `/dataset/${tool}`, query: { path: entry.path } })
 }
 
+function openUpload(entry: DatasetEntry) {
+  uploadTarget.value = entry.name
+}
+
+function onUploaded() {
+  void load(true)
+}
+
 onActivated(() => {
   void load()
   stopPolling()
@@ -177,6 +187,7 @@ onBeforeUnmount(stopPolling)
           <span v-else class="dataset-card-pending">{{ t("datasetManage.computing") }}</span>
         </dl>
         <footer class="dataset-card-actions">
+          <button class="primary-action" @click="openUpload(entry)">{{ t("datasetManage.upload") }}</button>
           <button class="secondary-action" @click="openTool('tagger', entry)">{{ t("datasetManage.openTagger") }}</button>
           <button class="secondary-action" @click="openTool('editor', entry)">{{ t("datasetManage.openEditor") }}</button>
         </footer>
@@ -191,6 +202,13 @@ onBeforeUnmount(stopPolling)
         <button class="primary-action" :disabled="rootSaving || !rootInput.trim()" @click="saveRoot">{{ t("datasetManage.save") }}</button>
       </template>
     </ElDialog>
+
+    <DatasetUploadDialog
+      :model-value="!!uploadTarget"
+      :dataset-name="uploadTarget"
+      @update:model-value="uploadTarget = ''"
+      @uploaded="onUploaded"
+    />
 
     <ElDialog v-model="createDialogOpen" :title="t('datasetManage.createDialogTitle')" width="480px">
       <ElInput v-model="createName" :placeholder="t('datasetManage.createPlaceholder')" @keyup.enter="createDataset" />

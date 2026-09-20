@@ -1204,3 +1204,123 @@
     justify-content: flex-end;
   }
 }
+
+.upload-dialog {
+  display: grid;
+  gap: 14px;
+}
+
+.upload-dropzone {
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.upload-dropzone.over {
+  border-color: var(--accent, #4f7cff);
+  background: var(--accent-soft, rgba(79, 124, 255, 0.06));
+}
+
+.upload-dropzone-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.upload-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+
+.upload-file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.upload-file-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-file-remove {
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.upload-conflicts {
+  border: 1px solid var(--danger, #dc2626);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.upload-conflicts h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.upload-conflicts ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.upload-conflict-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.upload-progress .meter {
+  flex: 1;
+}
+
+.upload-result {
+  font-size: 13px;
+  display: grid;
+  gap: 8px;
+}
+
+.upload-result ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--danger, #dc2626);
+}
+
+.upload-result .secondary-action {
+  justify-self: start;
+}
