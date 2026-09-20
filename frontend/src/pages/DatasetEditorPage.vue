@@ -2,6 +2,7 @@
 import { computed, onActivated, onDeactivated, onUnmounted, ref, watch } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import { useI18n } from "vue-i18n"
+import { useRoute } from "vue-router"
 import { datasetApi, type ChangedItem, type DatasetHistory, type DatasetItem } from "../api/dataset"
 import TagFilterPanel from "../components/dataset/TagFilterPanel.vue"
 import PathPickerDialog from "../components/PathPickerDialog.vue"
@@ -10,6 +11,7 @@ import { useServerPathPick } from "../composables/useServerPathPick"
 import { addTagToCaption, moveCaptionTag, removeTagFromCaption, splitCaptionTags } from "../dataset/caption"
 
 const { t } = useI18n()
+const route = useRoute()
 
 type RightPanelMode = "caption" | "filter" | "batch"
 
@@ -334,6 +336,13 @@ watch(pageCount, (count) => {
   if (page.value > count) page.value = count
 })
 onActivated(() => window.addEventListener("keydown", onPreviewKeydown))
+onActivated(() => {
+  const queryPath = route?.query.path
+  if (typeof queryPath === "string" && queryPath.trim() && queryPath !== path.value) {
+    path.value = queryPath
+    void scan()
+  }
+})
 onDeactivated(() => {
   window.removeEventListener("keydown", onPreviewKeydown)
   previewOpen.value = false

@@ -1073,3 +1073,134 @@
 .chip-add button {
   border-radius: 999px;
 }
+
+.dataset-manage {
+  padding: 24px clamp(20px, 3vw, 40px) 48px;
+  display: grid;
+  gap: 20px;
+}
+
+.dataset-manage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dataset-manage-root {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dataset-manage-root code {
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52vw;
+}
+
+.dataset-manage-root-missing {
+  color: var(--danger, #d55555);
+  font-size: 12px;
+}
+
+.dataset-manage-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dataset-manage-empty {
+  margin: 40px 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dataset-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.dataset-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.dataset-card-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dataset-card-path {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-card-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.dataset-card-stats dt {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.dataset-card-stats dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+
+.dataset-card-pending {
+  grid-column: 1 / -1;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.dataset-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dataset-manage-dialog-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .dataset-manage-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dataset-manage-root code {
+    max-width: none;
+  }
+
+  .dataset-manage-actions {
+    justify-content: flex-end;
+  }
+}
