@@ -14,7 +14,16 @@ from mikazuki.datasets.root import (
 )
 from mikazuki.datasets.sandbox import resolve_dataset_dir
 from mikazuki.datasets.stats import cached_overview, get_overview, invalidate_overview
-from mikazuki.datasets.trash import empty_trash, list_trash, restore_batch, soft_delete
+from mikazuki.datasets.trash import (
+    empty_trash,
+    empty_trash_any,
+    list_all_trash,
+    list_trash,
+    restore_batch,
+    restore_batch_by_id,
+    soft_delete,
+    soft_delete_dataset,
+)
 from mikazuki.datasets.upload import (
     MAX_BATCH_BYTES,
     cleanup_staging,
@@ -173,6 +182,35 @@ async def delete_files(name: str, req: DeleteFilesRequest):
     if result["deleted"]:
         invalidate_overview(dataset_dir)
     return APIResponseSuccess(data=result)
+
+
+@router.delete("/datasets/{name}")
+async def delete_dataset(name: str):
+    dataset_dir = existing_dataset_dir(name)
+    result = soft_delete_dataset(get_datasets_root(), dataset_dir)
+    invalidate_overview(dataset_dir)
+    return APIResponseSuccess(data=result)
+
+
+@router.get("/datasets-trash")
+async def trash_list_all():
+    return APIResponseSuccess(data={"batches": list_all_trash(get_datasets_root())})
+
+
+@router.post("/datasets-trash/restore")
+async def trash_restore_any(req: TrashRestoreRequest):
+    root = get_datasets_root()
+    result = restore_batch_by_id(root, req.id)
+    if result["restored"]:
+        invalidate_overview(resolve_dataset_dir(root, result["dataset"]))
+    return APIResponseSuccess(data=result)
+
+
+@router.post("/datasets-trash/empty")
+async def trash_empty_any(req: TrashEmptyRequest):
+    if not req.confirm:
+        raise HTTPException(status_code=400, detail="emptying the trash requires confirm=true")
+    return APIResponseSuccess(data=empty_trash_any(get_datasets_root(), req.id))
 
 
 @router.post("/datasets/{name}/upload/check")

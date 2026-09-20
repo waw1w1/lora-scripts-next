@@ -171,3 +171,58 @@ def test_trash_hidden_from_listing_and_export(workspace):
     response = client.get("/api/datasets/ds/download")
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         assert ".trash" not in "".join(archive.namelist())
+
+
+def test_delete_dataset_moves_everything_to_trash(workspace):
+    root, dataset_dir = workspace
+    client = TestClient(app)
+    response = client.delete("/api/datasets/ds")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert sorted(data["deleted"]) == ["a.png", "a.txt", "sub/b.jpg"]
+    assert not dataset_dir.exists()
+    assert [d["name"] for d in client.get("/api/datasets").json()["data"]["datasets"]] == []
+
+    batches = client.get("/api/datasets-trash").json()["data"]["batches"]
+    assert len(batches) == 1
+    assert batches[0]["dataset"] == "ds"
+    assert batches[0]["count"] == 3
+
+
+def test_global_restore_recreates_deleted_dataset(workspace):
+    root, dataset_dir = workspace
+    client = TestClient(app)
+    batch = client.delete("/api/datasets/ds").json()["data"]["batch"]
+
+    result = client.post("/api/datasets-trash/restore", json={"id": batch}).json()["data"]
+    assert result["dataset"] == "ds"
+    assert sorted(result["restored"]) == ["a.png", "a.txt", "sub/b.jpg"]
+    assert (dataset_dir / "sub" / "b.jpg").read_bytes() == b"jpg-b"
+    assert [d["name"] for d in client.get("/api/datasets").json()["data"]["datasets"]] == ["ds"]
+
+
+def test_global_restore_conflict_keeps_batch(workspace):
+    root, dataset_dir = workspace
+    client = TestClient(app)
+    batch = client.delete("/api/datasets/ds").json()["data"]["batch"]
+    (dataset_dir / "sub").mkdir(parents=True)
+    (dataset_dir / "sub" / "b.jpg").write_bytes(b"newer")
+
+    result = client.post("/api/datasets-trash/restore", json={"id": batch}).json()["data"]
+    assert sorted(result["restored"]) == ["a.png", "a.txt"]
+    assert result["conflicts"] == ["sub/b.jpg"]
+    assert (dataset_dir / "sub" / "b.jpg").read_bytes() == b"newer"
+    batches = client.get("/api/datasets-trash").json()["data"]["batches"]
+    assert batches[0]["paths"] == ["sub/b.jpg"]
+
+
+def test_global_empty_trash(workspace):
+    root, _dataset_dir = workspace
+    client = TestClient(app)
+    client.delete("/api/datasets/ds")
+
+    assert client.post("/api/datasets-trash/empty", json={}).status_code == 400
+    result = client.post("/api/datasets-trash/empty", json={"confirm": True}).json()["data"]
+    assert result["removed"] == 1
+    assert not (root / ".trash").exists() or not list((root / ".trash").iterdir())
