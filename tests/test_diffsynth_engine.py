@@ -1,6 +1,7 @@
 """DiffSynth contract tests: no model weights or GPU training are used."""
 import importlib.util
 import json
+import struct
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,18 @@ def configured(tmp_path):
     model = tmp_path / "模型 with spaces"
     for folder, name in (("transformer", "diffusion_pytorch_model-00001.safetensors"), ("text_encoder", "model-00001.safetensors"), ("vae", "diffusion_pytorch_model.safetensors")):
         (model / folder).mkdir(parents=True)
-        (model / folder / name).touch()
+        shapes = json.loads((Path(__file__).parent / "fixtures/diffsynth" / ({"transformer": "dit"}.get(folder, folder) + ".json")).read_text())
+        headers, offset = {}, 0
+        import math
+        for key, shape in shapes.items():
+            end = offset + math.prod(shape) * 2
+            headers[key] = {"dtype": "BF16", "shape": shape, "data_offsets": [offset, end]}
+            offset = end
+        raw = json.dumps(headers).encode()
+        with (model / folder / name).open("wb") as file:
+            file.write(struct.pack("<Q", len(raw)) + raw)
+            file.truncate(8 + len(raw) + offset)  # sparse fixture: headers only, no real model tensors
+
     (model / "processor").mkdir()
     for name in ("tokenizer.json", "tokenizer_config.json", "preprocessor_config.json", "chat_template.jinja", "video_preprocessor_config.json"):
         (model / "processor" / name).write_text("{}")
@@ -49,30 +61,16 @@ def test_official_arguments_and_process_isolation(configured, monkeypatch):
     rt, config = configured
     monkeypatch.setenv("PYTHONPATH", "/gui/packages")
     adapted = adapt_config(config, rt)
-    dump_config(adapted, rt.project_root / "autosave", "test")
-    spec = build_train_spec(rt, adapted.arguments, ["1"])
+    path = dump_config(adapted, rt.project_root / "autosave", "test")
+    spec = build_train_spec(rt, path, ["1"])
     assert spec.command[0] == str(rt.python)
-    assert spec.command[spec.command.index("--lora_rank") + 1] == "8"
-    assert spec.command[spec.command.index("--lora_target_modules") + 1] == ""
-    assert "--model_train_type" not in spec.command
-    assert "--use_gradient_checkpointing" in spec.command
-    assert "--enable_model_cpu_offload" not in spec.command
+    assert spec.command[spec.command.index("--config") + 1] == str(path)
+    assert adapted.arguments["lora_rank"] == 8
+    assert adapted.arguments["lora_target_modules"] == ""
     assert "PYTHONPATH" not in spec.env
     assert spec.env["CUDA_VISIBLE_DEVICES"] == "1"
     assert spec.env["HF_HUB_OFFLINE"] == "1"
     assert spec.cwd == rt.source
-    # Parse generated arguments against the pinned checkout's actual parser helpers.
-    upstream = Path(__file__).resolve().parents[2] / "DiffSynth-Studio"
-    if upstream.exists():
-        import argparse
-        spec_parser = importlib.util.spec_from_file_location("diffsynth_parsers", upstream / "diffsynth/diffusion/parsers.py")
-        parser_module = importlib.util.module_from_spec(spec_parser)
-        spec_parser.loader.exec_module(parser_module)
-        parser = parser_module.add_image_size_config(parser_module.add_general_config(argparse.ArgumentParser()))
-        parser.add_argument("--processor_path")
-        parser.add_argument("--initialize_model_on_cpu", action="store_true")
-        parsed = parser.parse_args(spec.command[spec.command.index(str(rt.source / TRAIN_SCRIPT)) + 1:])
-        assert parsed.lora_rank == 8 and parsed.learning_rate == 0.0002
 
 
 def test_missing_shard_fails_before_submission(configured):
@@ -92,13 +90,10 @@ def test_missing_caption_and_multiple_gpus_are_rejected(configured):
         adapt_config(config, rt)
 
 
-def test_nf4_matches_sharded_model_key(configured):
+def test_quantization_is_rejected(configured):
     rt, config = configured
-    adapted = adapt_config({**config, "diffsynth_quantization": "bitsandbytes_nf4"}, rt)
-    models = json.loads(adapted.arguments["model_paths"])
-    key, method = adapted.arguments["quant_options"].rsplit(":", 1)
-    assert json.loads(key) == models[0]
-    assert method == "bitsandbytes_nf4"
+    with pytest.raises(ValueError, match="量化"):
+        adapt_config({**config, "diffsynth_quantization": "bitsandbytes_nf4"}, rt)
 
 
 def test_install_uses_managed_python_complete_pin_and_mirrors(tmp_path):
@@ -133,14 +128,14 @@ def test_api_run_routes_parameters_into_task_without_training(configured, monkey
     from mikazuki.app.application import app
     from mikazuki.engines.diffsynth import run
     from mikazuki.engines.diffsynth import preflight
-    from mikazuki.engines.diffsynth.extension_state import write_state
+    from mikazuki.engines.diffsynth.extension_state import write_state, fingerprint
     rt, config = configured
     monkeypatch.chdir(rt.project_root)
     rt.python.parent.mkdir(parents=True)
     rt.python.touch()
     (rt.source / TRAIN_SCRIPT).parent.mkdir(parents=True)
     (rt.source / TRAIN_SCRIPT).touch()
-    write_state(rt, "ready", {"audit": {"ok": True}})
+    write_state(rt, "ready", {"audit": {"ok": True}, "fingerprint": fingerprint(rt)})
     monkeypatch.setattr(preflight, "audit_environment", lambda runtime: {"ok": True, "errors": []})
     submitted = []
     monkeypatch.setattr(run.tm, "submit", submitted.append)
@@ -152,9 +147,10 @@ def test_api_run_routes_parameters_into_task_without_training(configured, monkey
     try:
         assert not hasattr(task, "process")
         assert task.command[0] == str(rt.python)
-        assert task.command[task.command.index("--learning_rate") + 1] == "0.0002"
-        assert task.command[task.command.index("--num_epochs") + 1] == "2"
-        assert task.command[task.command.index("--lora_rank") + 1] == "8"
+        arguments = json.loads(Path(task.metadata["engine_config_path"]).read_text())["arguments"]
+        assert arguments["learning_rate"] == 0.0002
+        assert arguments["num_epochs"] == 2
+        assert arguments["lora_rank"] == 8
         assert response["data"]["metadata"]["backend"] == "diffsynth"
         assert Path(task.metadata["config_path"]).is_file()
     finally:

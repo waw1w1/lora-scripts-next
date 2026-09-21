@@ -19,7 +19,7 @@ async def preflight(config):
         rt = runtime()
         check_runtime(rt)
         adapted = adapt_config(config, rt)
-        build_train_spec(rt, adapted.arguments, config.get("gpu_ids"))
+        build_train_spec(rt, "preflight.json", config.get("gpu_ids"))
         return APIResponseSuccess(data={"ok": True, "errors": [], "warnings": [], "facts": {"images_with_repeats": len(adapted.dataset)}})
     except (ValueError, OSError) as exc:
         return APIResponseFail(message=str(exc), data={"ok": False, "errors": [str(exc)]})
@@ -31,7 +31,7 @@ async def dry_run(config):
         rt = runtime()
         adapted = adapt_config(config, rt)
         path = dump_config(adapted, rt.project_root / "config/autosave", f"diffsynth-dry-{uuid.uuid4().hex[:8]}")
-        spec = build_train_spec(rt, adapted.arguments, config.get("gpu_ids"))
+        spec = build_train_spec(rt, path, config.get("gpu_ids"))
         return APIResponseSuccess(data={"command": spec.command, "cwd": str(spec.cwd), "engine_config_path": str(path), "config": adapted.arguments})
     except (ValueError, OSError) as exc:
         return APIResponseFail(message=str(exc))

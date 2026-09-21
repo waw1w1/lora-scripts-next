@@ -247,7 +247,14 @@ def list_preview_images(metadata: dict) -> list[dict]:
         except OSError:
             continue
         step = parse_ai_toolkit_step(path.name) if ai_toolkit else parse_step(path.name)
-        images.append({"name": path.name, "epoch": parse_epoch(path.name), "step": step, "mtime": mtime})
+        image = {"name": path.name, "epoch": parse_epoch(path.name), "step": step, "mtime": mtime}
+        if metadata.get("backend") == "diffsynth":
+            step_match = re.search(r"-step-(\d+)-sample-", path.name)
+            image["step"] = int(step_match[1]) if step_match else None
+            match = re.search(r"-sample-(\d+)\.png$", path.name)
+            if match:
+                image["sample_id"] = int(match[1])
+        images.append(image)
     return images
 
 

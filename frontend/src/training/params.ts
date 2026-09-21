@@ -99,6 +99,7 @@ export function buildTrainingConfig(source: FormModel, schemaName: string) {
   const config: FormModel = schemaName === "lora-basic" ? { ...BASIC_DEFAULTS, ...cloneFormModel(source) } : cloneFormModel(source)
   const lockedTrainType = SCHEMA_TRAIN_TYPES[schemaName]
   if (lockedTrainType) config.model_train_type = lockedTrainType
+  if (schemaName === "qwen-image-21-lora") return config
   let networkArgs: string[] = []
   let optimizerArgs: string[] = []
 

@@ -368,7 +368,7 @@ onBeforeUnmount(() => {
           <div v-else-if="error" class="schema-state schema-error"><strong>{{ t("training.schemaError") }}</strong><span>{{ error }}</span><button @click="load">{{ t("training.retry") }}</button></div>
           <DynamicSchemaForm v-else-if="schema" :model-value="model" :schema="schema" :errors="errors" :effective-defaults="effectiveDefaults" @update:model-value="updateModel" @reset-field="resetField">
         <template #[modelToolsSlot]>
-          <ModelAssetsTools :schema-name="schemaName" :model="model" />
+          <ModelAssetsTools v-if="schemaName !== 'qwen-image-21-lora'" :schema-name="schemaName" :model="model" />
         </template>
       </DynamicSchemaForm>
         </div>

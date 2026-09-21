@@ -194,3 +194,14 @@
 3. 与旧版的已知行为差异。
 4. 自动化及手工验证结果。
 5. 尚未解决的问题和优先级。
+
+
+### DiffSynth review integration
+
+Qwen-Image-2.1 now uses conditional directory/component inputs and image-TXT/native-metadata
+inputs through the shared schema adapter. Existing directory-only drafts remain compatible
+with the directory default. PreviewSampleField was adapted from the author's Klein branch
+for t2i samples; task previews, server path picking and config history reuse existing APIs.
+DiffSynth bypasses Kohya-specific parameter conversion; inactive schema fields are omitted.
+No training-page model download/probe widget is shown. CPU model offload + sampling is
+explicitly unavailable for the pinned upstream runner; see docs/diffsynth.md.

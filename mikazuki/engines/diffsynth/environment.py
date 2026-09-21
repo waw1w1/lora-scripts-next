@@ -14,7 +14,7 @@ def install_commands(runtime, sources):
         ["uv", "python", "install", PYTHON_VERSION, "--install-dir", str(runtime.python_install_dir)],
         ["uv", "venv", "--clear", "--managed-python", "--python", PYTHON_VERSION, str(runtime.root / ".venv")],
         ["uv", "pip", "install", "--python", str(runtime.python), "--index-url", torch_index, "torch==2.8.0", "torchvision==0.23.0"],
-        ["uv", "pip", "install", "--python", str(runtime.python), *index, "-e", str(runtime.source), "transformers>=4.57.1,<5", "tensorboard", "bitsandbytes>=0.48", "torch==2.8.0", "torchvision==0.23.0"],
+        ["uv", "pip", "install", "--python", str(runtime.python), *index, "-e", str(runtime.source), "transformers>=4.57.1,<5", "tensorboard", "torch==2.8.0", "torchvision==0.23.0"],
     ]
 
 

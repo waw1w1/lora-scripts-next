@@ -1,99 +1,54 @@
-# DiffSynth-Studio integration notes
+# DiffSynth review validation
 
-## Scope
+This revision supersedes the original PR smoke report. Only Qwen-Image-2.1 BF16
+t2i LoRA is exposed. GPU training is deliberately not run in this environment.
 
-Only Qwen-Image-2.1 text-to-image LoRA, single NVIDIA GPU, BF16. The complete
-upstream checkout is pinned at `7686e54d41d25c0e8ed5f1318acc23b6bb832654` and is
-not patched. Image editing, full finetuning, other models, multi-GPU and
-in-training sampling are not exposed.
+## Sources checked
 
-The engine owns a uv-managed Python 3.12 under `extensions/diffsynth/.python`
-and packages under `extensions/diffsynth/.venv`. Installation sets
-`UV_PYTHON_INSTALL_DIR` to the engine directory; repair recreates both.
-The GUI does not import DiffSynth or share its Python packages. PyTorch
-2.8.0/cu128 and torchvision 0.23.0 are installed first; the training environment
-also installs Transformers 4.57.x, TensorBoard and bitsandbytes. No DeepSpeed,
-FlashAttention or Bash launcher is required.
+- GUI dev base: `b4df253cfc5d2d6901651c15be909cbd10bd1118`.
+- Complete DiffSynth checkout: `7686e54d41d25c0e8ed5f1318acc23b6bb832654`, unchanged.
+- ComfyUI loader: `b0f4b7b294ce482a2e071d9d762c133d38c7aa07`, unchanged.
+- Comfy-Org/Qwen-Image-2.1 BF16 safetensors headers (no real tensors downloaded).
+- PreviewSampleField interaction reused from author's `feat/ai-toolkit-klein` branch,
+  with edit-only/unsupported controls removed for this t2i entry.
 
-## Validation matrix
+## Verified boundaries
 
-| Environment | Python | torch | CUDA / GPU | Result | Date |
-| --- | --- | --- | --- | --- | --- |
-| Linux x86_64 cloud, independent interpreter | 3.12.14 | 2.8.0+cu128 | CUDA 12.8 package; no GPU attached | Source checkout, dependency install, pipeline imports and official `train.py --help` passed. Production readiness correctly rejected missing CUDA GPU. | 2026-09-21 |
-| Windows 11 / RTX 5090 D | Not run | Not run | Not available in this environment | Requires target-machine verification; no training or VRAM claim. | 2026-09-21 |
+- Full BF16 component key/shape normalization matches all three pinned DiffSynth
+  model hashes. Tiny tensor tests verify fused MLP row ordering and VAE time-axis
+  removal; cache writes do not modify input files.
+- Real PEFT-generated synthetic LoRA -> safetensors -> unmodified ComfyUI
+  `model_lora_keys_unet`, `load_lora`, `calculate_weight`: all tensors mapped,
+  both fused MLP halves and ordinary output layer produce the expected numerical
+  weight update. This is not full-model inference or a training-quality test.
+- Mixed image/TXT directory repeats, ordinary/root images, empty/missing captions,
+  original CSV/JSON/JSONL metadata, mode-specific config import/export.
+- Structured preview samples, optimizer-update accounting including a final partial
+  accumulation, scheduler/RNG/mode restoration, existing task preview API filenames.
+- Real installer supervisor and child process cancellation through existing Task;
+  environment lock release; ready invalidation on source change.
+- HTTP `/api/run` -> Task -> actual Accelerate subprocess -> thin entry -> actual
+  pinned upstream parser: exit 0 with submitted parameters. CUDA readiness alone
+  is substituted in the test process; `--check-only` prevents tensor loading and
+  training. Production installation still requires a working CUDA runtime.
+- Backend regression: 139 tests passed, including engine dispatch, config import/export,
+  task lifecycle/insights, SPA routes and the DiffSynth/Comfy tests.
+- Frontend Node 22: typecheck, lint, 211 Vitest tests and production build passed.
+  Existing lint warnings in EngineStatusBar and the bundle-size warning remain.
 
-## Integration details / findings
+## Remaining acceptance
 
-- P2: use base DiffSynth dependencies, TensorBoard and the selected NF4 backend;
-  do not install the optional `[training]` extra that brings DeepSpeed.
-- P3: launch through the independent Python, remove inherited PYTHONPATH and
-  disable user-site packages. Pass argv as a list and resolve filesystem paths
-  before changing cwd. Chinese paths, spaces and an empty target-layer argument
-  are covered by tests.
-- P6: use `diffsynth_model_dir` for the model root instead of borrowing Kohya's
-  base-model field.
-- P7: keep the complete upstream Git checkout, including examples and root files.
-- P8: register official Qwen assets with the existing download UI and require
-  local transformer/text_encoder/vae/processor files. Check shard indexes and
-  processor/template files before submission. Training uses local model paths
-  and HF offline mode; it does not initiate an asset download.
-- Upstream `DataLoader` uses a lambda collator. Workers are fixed at zero to
-  avoid Windows spawn pickling failures, without patching upstream.
-- Upstream empty `lora_target_modules` enables automatic target detection;
-  preserve the empty argv value rather than falling back to the generic parser
-  default `q,k,v,...`.
-- UI TOML is separate from native argument JSON and dataset JSON. TensorBoard
-  lives in the run's `tensorboard_log` directory, using the `loss` tag. The
-  shared insights resolver must take the actual runtime directories from task
-  metadata (the UI TOML contains the parent output directory).
-- Each submission receives a separate output subdirectory. This prevents older
-  appended CSV rows and TensorBoard events being mistaken for the new run.
-- CSV `step` counts batches, as does the upstream save interval. It is not the
-  optimizer-update count when gradient accumulation is enabled.
+- Native Windows installation/cancellation and real RTX 5090 D GPU training have
+  not been repeated for this revision.
+- Actual exported trained Qwen LoRA must still be reloaded and sampled with native
+  ComfyUI nodes; the CPU synthetic loader test is not a substitute.
+- The cloud browser rejects this environment's localhost (`ERR_BLOCKED_BY_CLIENT`)
+  and no supported preview address is available. The real backend runs locally;
+  this revision has component tests and HTTP/subprocess smoke, not browser-click
+  end-to-end evidence or new screenshots.
+- CPU model offload + in-training sampling is explicitly rejected. The pinned
+  upstream runner does not expose its OffloadTrainingManager to logger callbacks.
+  Supporting that combination requires a public upstream lifecycle hook; do not
+  claim it works, copy the training loop or reach into private hook closures.
 
-## Smoke evidence
-
-| Qwen-Image-2.1 LoRA check | Result |
-| --- | --- |
-| Install complete source + managed Python + venv + dependencies | Passed; CUDA readiness check blocked on CPU-only host as expected |
-| Official training script imports and argument help | Passed without model loading |
-| Real engine-management page and model/engine selector | Visible in Chromium; unavailable runtime correctly gates training |
-| Real form -> HTTP `/api/run` -> task manager -> Popen | Passed using test-only CUDA readiness fixtures |
-| Actual isolated Accelerate -> pinned official `train.py --help` | Exit 0; no training executed |
-| LoRA weights / sample images / GPU memory | Not tested; user explicitly requested no training |
-
-The browser smoke changes **only its test server process**: CUDA readiness is
-mocked and `--help` is appended at the task execution boundary. Production code
-has no bypass flag. Placeholder model files are only preflight fixtures and
-are never loaded. This proves transport/launch, not successful GPU training.
-
-Local smoke evidence: `.runtime/diffsynth-smoke/{submission,launch,task}.json`,
-`result.log`, `production-server.log`, `test-server.log`, and UI screenshots.
-Test assets and environments are excluded from Git.
-
-## Dev branch validation
-
-The adaptation is based on `origin/dev` at
-`b4df253cfc5d2d6901651c15be909cbd10bd1118`, not the main release branch.
-Only DiffSynth changes were transferred; dev's updater, homepage, version and
-dataset-config behavior remain intact. Frontend assets were rebuilt from dev.
-
-Regression checks: `frontend/npm run check` (209 tests plus typecheck/lint/build);
-114 targeted Python tests passed, 3 existing torch-dependent checks skipped in
-the lightweight GUI test environment, plus 6 passing subtests. Scope includes
-engine dispatch, adapters, config import/export, asset checks, task insights,
-SPA routes and dev dataset-config/image-scan/preview regressions.
-See `tests/test_diffsynth_engine.py`.
-
-The full repair API was rerun on dev: source download, local Python installation,
-venv creation, torch/dependency installation and official entry imports passed.
-`sys.base_prefix` resolves inside the engine's `.python` directory. The only
-audit error is the expected missing CUDA GPU. Recreating the venv uses
-`uv venv --clear` so a partial environment cannot block an installation retry.
-Evidence: `.runtime/dev-validation/install-result.json` and `install.log`.
-
-The browser smoke was rerun against the dev build: the real production gate
-and engine selector render correctly; the test server's frontend POST reaches
-the real task process and isolated official `train.py --help` exits 0, with
-no browser errors. Same test-only CUDA/--help boundaries described above apply.
-Evidence: `.runtime/dev-validation/browser.log` and the refreshed smoke JSONs.
+See `docs/diffsynth.md` for user-facing setup, Processor requirements and limits.
