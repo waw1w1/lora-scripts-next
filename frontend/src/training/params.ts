@@ -42,6 +42,7 @@ export const CROSS_SCHEMA_DENY_KEYS = [
 
 /** schemaName → locked model_train_type for pages that own a single train type. */
 export const SCHEMA_TRAIN_TYPES: Record<string, string> = {
+  "qwen-image-21-lora": "qwen-image-21-lora",
   "anima-lora-fast": "anima-lora-fast",
   "sd3-lora": "anima-lora",
   "anima-finetune": "anima-finetune",

@@ -94,9 +94,9 @@ def _is_ai_toolkit(metadata: dict) -> bool:
 
 
 def resolve_task_dirs(metadata: dict) -> dict:
-    # ai-toolkit task configs are YAML (unreadable here); its run handler
-    # carries the resolved dirs in metadata instead.
-    if _is_ai_toolkit(metadata):
+    # These engines keep UI configs separate from native runtime arguments.
+    # Their run handlers carry the actual output/log directories in metadata.
+    if (metadata or {}).get("backend") in {AI_TOOLKIT_BACKEND, "diffsynth"}:
         return {
             "output_dir": _resolve_dir((metadata or {}).get("output_dir")),
             "logging_dir": _resolve_dir((metadata or {}).get("logging_dir")),
@@ -296,7 +296,7 @@ def read_loss_scalars(metadata: dict, limit: int = LOSS_POINT_LIMIT) -> dict:
     chosen = _select_run_dir(run_mtimes, output_name, since, until)
     if chosen is None:
         return {}
-    tags = AI_TOOLKIT_LOSS_TAGS if _is_ai_toolkit(metadata) else LOSS_TAGS
+    tags = ("loss",) if metadata.get("backend") == "diffsynth" else (AI_TOOLKIT_LOSS_TAGS if _is_ai_toolkit(metadata) else LOSS_TAGS)
     return _read_run_scalars(chosen, limit, tags)
 
 

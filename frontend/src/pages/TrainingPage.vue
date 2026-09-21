@@ -268,6 +268,10 @@ async function submit() {
       if (!preflight.ok) throw new Error(preflight.errors?.join("\n") || t("training.submitConfirm.preflightFail"))
       preflight.warnings?.forEach((warning) => ElMessage.warning(warning))
     }
+    if (props.schemaName === "qwen-image-21-lora") {
+      const preflight = await trainingApi.diffsynthPreflight(output.value)
+      if (!preflight.ok) throw new Error(preflight.errors?.join("\n") || t("training.submitConfirm.preflightFail"))
+    }
     started.value = await trainingApi.run(output.value)
     tasksStore.markAttention()
     tasksStore.refresh({ silent: true })
