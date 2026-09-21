@@ -38,6 +38,11 @@ t2i LoRA is exposed. GPU training is deliberately not run in this environment.
 
 ## Remaining acceptance
 
+- Local follow-up on 2026-09-21: 23 input-guard tests pass, covering unsupported
+  editing requests, malformed numeric/Sample values, and run/preflight/dry-run
+  failures without task creation. These checks use mocked model/data paths,
+  not model weights or GPU training.
+
 - Native Windows installation/cancellation and real RTX 5090 D GPU training have
   not been repeated for this revision.
 - Actual exported trained Qwen LoRA must still be reloaded and sampled with native

@@ -17,13 +17,21 @@ class AdaptedConfig:
 
 def positive_int(config, key, default):
     value = config.get(key, default)
-    number = int(value)
-    if number < 1 or float(value) != number:
-        raise ValueError(f"{key} 必须为正整数")
+    try:
+        number = int(value)
+        valid = not isinstance(value, bool) and number >= 1 and float(value) == number
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        raise ValueError(f"{key} 必须为正整数") from None
     return number
 
 
 def adapt_config(config, runtime):
+    if config.get("training_task", "text-to-image") != "text-to-image":
+        raise ValueError("training_task: 当前仅支持文生图，不支持编辑训练")
+    if config.get("control_data_dirs", []) != []:
+        raise ValueError("control_data_dirs: 当前文生图训练不支持参考图目录")
     for field in ("output_dir", "output_name"):
         if not str(config.get(field, "")).strip():
             raise ValueError(f"缺少必填参数: {field}")
@@ -33,9 +41,14 @@ def adapt_config(config, runtime):
     if name in {".", ".."} or any(c in name for c in '/\\:'):
         raise ValueError("输出名称应为文件夹名称，不能包含路径分隔符")
     output = absolute(config["output_dir"], runtime.project_root) / name
-    lr = float(config.get("learning_rate", 1e-4))
-    if not math.isfinite(lr) or lr <= 0:
-        raise ValueError("学习率必须为正数")
+    value = config.get("learning_rate", 1e-4)
+    try:
+        lr = float(value)
+        valid = not isinstance(value, bool) and math.isfinite(lr) and lr > 0
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
+        raise ValueError("learning_rate: 学习率必须为有限正数") from None
     arguments = {
         "dataset_base_path": str(dataset_dir),
         "data_file_keys": "image",
@@ -60,7 +73,7 @@ def adapt_config(config, runtime):
     }
     for key, default in (("use_gradient_checkpointing", True), ("use_gradient_checkpointing_offload", False), ("initialize_model_on_cpu", True), ("enable_model_cpu_offload", False)):
         arguments[key] = bool(config.get(key, default))
-    if config.get("save_steps"):
+    if config.get("save_steps") not in (None, ""):
         arguments["save_steps"] = positive_int(config, "save_steps", 100)
     if config.get("lora_checkpoint"):
         checkpoint = absolute(config["lora_checkpoint"], runtime.project_root)

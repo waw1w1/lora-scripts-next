@@ -6,18 +6,29 @@ DEFAULT_SAMPLE = {'prompt': '', 'width': 1024, 'height': 1024, 'seed': 42, 'guid
 
 
 def sample_config(config):
-    enabled = bool(config.get('sample_enabled', False))
+    enabled = config.get('sample_enabled', False)
+    if not isinstance(enabled, bool):
+        raise ValueError('sample_enabled 必须是布尔值')
     if not enabled:
         return {'enabled': False, 'every_steps': 100, 'samples': []}
     interval = config.get('sample_every_n_steps', 100)
-    if isinstance(interval, bool) or int(interval) != float(interval) or int(interval) < 1:
+    try:
+        valid = not isinstance(interval, bool) and int(interval) == float(interval) and int(interval) >= 1
+    except (TypeError, ValueError, OverflowError):
+        valid = False
+    if not valid:
         raise ValueError('sample_every_n_steps 必须为正整数（优化器更新次数）')
     samples = config.get('preview_samples', [json.dumps(DEFAULT_SAMPLE)])
-    if not samples:
-        raise ValueError('至少需要一个预览样例')
+    if not isinstance(samples, list) or not samples:
+        raise ValueError('preview_samples 必须是非空的 JSON 字符串列表')
     result = []
     for i, value in enumerate(samples):
-        sample = json.loads(value)
+        try:
+            if not isinstance(value, str):
+                raise ValueError()
+            sample = json.loads(value)
+        except (TypeError, ValueError):
+            raise ValueError(f'preview_samples 第 {i + 1} 项必须是有效 JSON 字符串') from None
         if not isinstance(sample, dict) or set(sample) - (set(DEFAULT_SAMPLE) | {'controlImages'}):
             raise ValueError(f'预览样例 {i + 1} 包含不支持的参数')
         if sample.pop('controlImages', []) != []:
@@ -33,9 +44,13 @@ def sample_config(config):
             sample[key] = int(number)
         if sample['width'] % 32 or sample['height'] % 32:
             raise ValueError('预览宽高必须是 32 的倍数')
-        cfg = float(sample['guidance_scale'])
-        if not math.isfinite(cfg) or cfg < 1:
-            raise ValueError('预览 guidance_scale 必须 >= 1')
+        try:
+            cfg = float(sample['guidance_scale'])
+            valid = not isinstance(sample['guidance_scale'], bool) and math.isfinite(cfg) and cfg >= 1
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            raise ValueError(f'preview_samples 第 {i + 1} 项 guidance_scale 必须是 >= 1 的有限数值') from None
         sample['guidance_scale'] = cfg
         result.append(sample)
     return {'enabled': True, 'every_steps': int(interval), 'samples': result}
