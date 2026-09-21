@@ -299,3 +299,14 @@ def test_worker_progress_uses_existing_hub_event_stream():
     hub.append_line('install', '[mikazuki-progress] malformed')
     hub.append_line('install', 'normal output')
     assert hub.tail('install')[-1] == 'normal output'
+
+
+@pytest.mark.parametrize('references', [[], ['reference.png'], '', None])
+def test_shared_sample_contract_allows_only_empty_t2i_references(references):
+    sample = {**DEFAULT_SAMPLE, 'controlImages': references}
+    config = {'sample_enabled': True, 'preview_samples': [json.dumps(sample)]}
+    if references == []:
+        assert sample_config(config)['samples'] == [DEFAULT_SAMPLE]
+    else:
+        with pytest.raises(ValueError, match='controlImages'):
+            sample_config(config)

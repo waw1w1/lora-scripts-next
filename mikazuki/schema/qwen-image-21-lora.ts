@@ -60,7 +60,7 @@ Schema.intersect([
         Schema.object({
             sample_enabled: Schema.const(true),
             sample_every_n_steps: Schema.number().min(1).step(1).default(100).description("每 N 次优化器更新预览，与保存步数使用同一口径；失败时任务报错停止"),
-            preview_samples: Schema.array(String).role('preview-samples').default(['{"prompt":"","width":1024,"height":1024,"seed":42,"guidance_scale":4,"sample_steps":20}']).description("预览样例，可添加多组独立参数"),
+            preview_samples: Schema.array(String).role('preview-samples', { dimensionStep: 32, minGuidance: 1 }).default(['{"prompt":"","width":1024,"height":1024,"seed":42,"guidance_scale":4,"sample_steps":20}']).description("预览样例，可添加多组独立参数"),
         }),
         Schema.object({ sample_enabled: Schema.const(false) }),
     ]),

@@ -18,8 +18,10 @@ def sample_config(config):
     result = []
     for i, value in enumerate(samples):
         sample = json.loads(value)
-        if not isinstance(sample, dict) or set(sample) - set(DEFAULT_SAMPLE):
+        if not isinstance(sample, dict) or set(sample) - (set(DEFAULT_SAMPLE) | {'controlImages'}):
             raise ValueError(f'预览样例 {i + 1} 包含不支持的参数')
+        if sample.pop('controlImages', []) != []:
+            raise ValueError(f'预览样例 {i + 1}: 文生图不支持参考图，controlImages 必须为空数组')
         sample = {**DEFAULT_SAMPLE, **sample}
         if not isinstance(sample['prompt'], str):
             raise ValueError(f'预览样例 {i + 1} 的 prompt 必须是字符串')

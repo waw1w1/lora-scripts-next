@@ -842,12 +842,3 @@
 .schema-field .el-select__wrapper:hover {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent) inset;
 }
-
-.preview-sample-control { width: 100%; display: grid; gap: 12px; }
-.preview-sample-heading, .preview-sample-item-heading { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.preview-sample-heading span { font-size: 13px; }
-.preview-sample-item { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--el-border-color); border-radius: 8px; }
-.preview-sample-prompt, .preview-sample-setting { display: grid; gap: 6px; }
-.preview-sample-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-.preview-sample-settings .el-input-number { width: 100%; }
-.preview-sample-add, .preview-sample-remove { padding: 6px 12px; border: 1px solid var(--el-border-color); border-radius: 6px; background: var(--el-bg-color); color: var(--el-text-color-primary); cursor: pointer; }
