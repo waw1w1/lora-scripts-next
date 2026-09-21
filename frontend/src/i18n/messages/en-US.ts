@@ -1,4 +1,5 @@
 export default {
+  sampleInputs: { reference: "Reference path", remove: "Remove", addReference: "Add reference", addSample: "Add Sample", width: "Width", height: "Height", seed: "Seed", guidance_scale: "CFG", sample_steps: "Sampling steps" },
   app: {
     brand: "Next Trainer",
     prerelease: "rc",
