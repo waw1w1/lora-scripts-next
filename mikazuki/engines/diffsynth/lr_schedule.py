@@ -70,6 +70,14 @@ def launch_with_schedule(accelerator, dataset, model, logger, args, settings):
         return scheduler
 
     globals_copy = dict(launch_training_task.__globals__)
+    upstream_offload_manager = globals_copy['OffloadTrainingManager']
+
+    def create_offload_manager(model, *positional, **kwargs):
+        manager = upstream_offload_manager(model, *positional, **kwargs)
+        model._preview_offload_manager = manager
+        return manager
+
+    globals_copy['OffloadTrainingManager'] = create_offload_manager
     class EpochDataLoader(torch.utils.data.DataLoader):
         def __iter__(self):
             if hasattr(self.dataset, 'shuffle_batches'):

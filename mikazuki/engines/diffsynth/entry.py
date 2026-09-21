@@ -97,9 +97,7 @@ def main():
                 from mikazuki.engines.diffsynth.buckets import batched_dataset
                 dataset = batched_dataset(dataset, [tuple(s) for s in config['bucket_sizes']], config['train_batch_size'])
             args.model_paths = json.dumps([paths[0]])
-            sample_callback = partial(cached_sample, paths=paths, previews=previews,
-                model_class=TrainingModule, rank=args.lora_rank,
-                target_modules=args.lora_target_modules, processor_path=args.processor_path)
+            sample_callback = partial(cached_sample, paths=paths, previews=previews)
         parameters = inspect.signature(upstream.QwenImage21TrainingModule).parameters
         model_args = {key: value for key, value in vars(args).items() if key in parameters}
         model_args['device'] = 'cpu' if args.initialize_model_on_cpu or args.enable_model_cpu_offload else accelerator.device

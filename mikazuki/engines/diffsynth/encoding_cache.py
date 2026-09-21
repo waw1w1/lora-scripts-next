@@ -3,6 +3,7 @@ import gc
 import hashlib
 import json
 import pickle
+from contextlib import contextmanager
 from pathlib import Path
 import torch
 
@@ -148,50 +149,66 @@ def prepare_cache(dataset, paths, args, config, device):
     return EncodedDataset(items, dataset.repeat, args), previews
 
 
-def cached_sample(model, sample, paths, previews, model_class, rank, target_modules, processor_path):
-    """Separate inference model avoids changing CPU-offload training hooks/state."""
+@contextmanager
+def preview_offload(model):
+    """Keep each inference forward offloaded, without altering training hooks."""
+    manager = getattr(model, '_preview_offload_manager', None)
+    handles, states = [], []
+    try:
+        if manager is not None:
+            for unit in manager.units:
+                states.append((unit, unit._in_recompute.copy()))
+                unit._in_recompute.clear()
+                # The upstream forward hook normally keeps subsequent recomputes
+                # resident for backward. Inference has no backward/recompute.
+                def finish_forward(module, args, output, unit=unit):
+                    unit._in_recompute.clear()
+                handles.append(unit.param_manager.model.register_forward_hook(finish_forward))
+        yield
+    finally:
+        for handle in handles:
+            handle.remove()
+        for unit, state in states:
+            for offloader in unit.param_manager.param_offloaders.values():
+                offloader.offload()
+            unit._in_recompute.clear()
+            unit._in_recompute.update(state)
+
+
+def cached_sample(model, sample, paths, previews):
+    """Share the training DiT; only VAE and small inference state are temporary."""
     from diffsynth.core import ModelConfig
     from diffsynth.pipelines.qwen_image_21 import QwenImage21Pipeline, QwenImage21Unit_PromptEmbedder
     from types import MethodType
 
-    preview = model_class(model_paths=json.dumps([paths[0]]), device='cpu',
-                          processor_path=processor_path,
-                          lora_base_model='dit', lora_rank=rank,
-                          lora_target_modules=target_modules)
-    state = {k: v.detach().cpu() for k, v in model.pipe.dit.state_dict().items() if '.lora_' in k}
-    result = preview.pipe.dit.load_state_dict(state, strict=False)
-    if result.unexpected_keys:
-        raise ValueError(f'Preview LoRA mismatch: {result.unexpected_keys}')
-    pipe = preview.pipe
-    pipe.eval()
-    pipe.device = model.pipe.device
-    vae_pipe = QwenImage21Pipeline.from_pretrained(device='cpu', torch_dtype=torch.bfloat16,
-                                                  model_configs=[ModelConfig(path=paths[2])])
-    pipe.vae = vae_pipe.vae
-    del vae_pipe
+    pipe = QwenImage21Pipeline(device=model.pipe.device, torch_dtype=model.pipe.torch_dtype)
+    pipe.dit = model.pipe.dit
+    assert pipe.dit is model.pipe.dit
+    print('[sampling] reusing training DiT; no second DiT loaded', flush=True)
 
     def load_components(self, names):
-        for name in ('dit', 'vae'):
-            component = getattr(self, name)
-            if name not in names:
-                component.to('cpu')
-        release()
-        for name in names:
-            component = getattr(self, name, None)
-            if component is not None:
-                component.to(self.device)
+        # Never .to() the shared DiT: it is either resident or managed by the
+        # original training offload hooks; optimizer parameter identities stay put.
+        if 'vae' in names and self.vae is None:
+            vae_pipe = QwenImage21Pipeline.from_pretrained(device='cpu', torch_dtype=self.torch_dtype,
+                                                          model_configs=[ModelConfig(path=paths[2])])
+            self.vae = vae_pipe.vae
+            self.vae.to(self.device).eval()
     pipe.load_models_to_device = MethodType(load_components, pipe)
     # The regular inference units remain intact except prompt encoding.
     for unit in pipe.units:
         if isinstance(unit, QwenImage21Unit_PromptEmbedder):
             def encoded(self, pipeline, prompt, edit_image):
-                return preview.transfer_data_to_device(read_tensor(previews[prompt]), pipeline.device, pipeline.torch_dtype)
+                return model.transfer_data_to_device(read_tensor(previews[prompt]), pipeline.device, pipeline.torch_dtype)
             unit.process = MethodType(encoded, unit)
     try:
-        return pipe(prompt=sample['prompt'], negative_prompt='', width=sample['width'], height=sample['height'],
-                    seed=sample['seed'], cfg_scale=sample['guidance_scale'],
-                    num_inference_steps=sample['sample_steps'], tiled=True)
+        with preview_offload(model):
+            return pipe(prompt=sample['prompt'], negative_prompt='', width=sample['width'], height=sample['height'],
+                        seed=sample['seed'], cfg_scale=sample['guidance_scale'],
+                        num_inference_steps=sample['sample_steps'], tiled=True)
     finally:
-        pipe.to('cpu')
-        del pipe, preview, state
+        if pipe.vae is not None:
+            pipe.vae.to('cpu')
+        pipe.dit = None
+        del pipe
         release()
