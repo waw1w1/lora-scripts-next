@@ -1,4 +1,5 @@
 export default {
+  sampleInputs: { reference: "参考路径", remove: "移除", addReference: "添加参考路径", addSample: "添加样例", width: "宽度", height: "高度", seed: "随机种子", guidance_scale: "CFG", sample_steps: "采样步数" },
   app: {
     brand: "Next Trainer",
     prerelease: "RC",
@@ -33,12 +34,14 @@ export default {
         lumina: "Lumina 2",
         krea2: "Krea 2",
         klein: "Klein (FLUX.2)",
+        "qwen-image-21": "Qwen-Image-2.1",
       },
       engines: {
         kohya: "Kohya-ss",
         "anima-fast": "Anima Fast",
         musubi: "Musubi-Tuner",
         "ai-toolkit": "AI Toolkit",
+        diffsynth: "DiffSynth-Studio",
       },
       targets: {
         lora: "LoRA",
@@ -179,6 +182,7 @@ export default {
       "flux-lora": { title: "Flux LoRA", area: "Flux · Kohya-ss · LoRA" },
       "lumina2-lora": { title: "Lumina 2 LoRA", area: "Lumina 2 · Kohya-ss · LoRA" },
       "krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · Musubi-Tuner · LoRA" },
+      "qwen-image-21-lora": { title: "Qwen-Image-2.1 LoRA", area: "Qwen-Image-2.1 · DiffSynth-Studio · LoRA" },
       "klein-lora": { title: "Klein LoRA", area: "FLUX.2 Klein · AI Toolkit · LoRA" },
     },
   },
@@ -431,6 +435,7 @@ export default {
         anima: "Anima",
         krea2: "Krea 2",
         klein: "Klein",
+        "qwen-image-21": "Qwen-Image-2.1",
         nvidia: "NVIDIA",
       },
       downloadSources: {
@@ -507,6 +512,11 @@ export default {
         resetDone: "已恢复官方默认",
       },
       catalog: {
+        diffsynth: {
+          name: "DiffSynth-Studio",
+          summary: "Qwen-Image-2.1 LoRA · 独立 Python / venv · 官方训练入口",
+          sizeHint: "运行环境需数 GB；模型权重需另行下载",
+        },
         kohya: {
           name: "Kohya-ss",
           summary: "内置训练引擎，使用主环境，开箱即用。",
@@ -576,6 +586,7 @@ export default {
       confirm: {
         animaFast: "Anima Fast 会下载独立 Python 环境和数 GB 依赖，并要求 NVIDIA GPU。确认继续？",
         install: {
+          diffsynth: "DiffSynth-Studio 会下载独立 Python 和数 GB 依赖，并要求 NVIDIA GPU。确认继续？",
           "anima-fast": "Anima Fast 会下载独立 Python 环境和数 GB 依赖，并要求 NVIDIA GPU。确认继续？",
           musubi: "Musubi-Tuner 会下载独立 Python 环境和数 GB 依赖，并要求 NVIDIA GPU。确认继续？",
           "ai-toolkit": "AI Toolkit 会下载独立 Python 环境和数 GB 依赖，并要求 NVIDIA GPU。确认继续？",
@@ -910,6 +921,10 @@ export default {
     install: "安装插件",
     consoleIdle: "安装日志",
     consoleWaiting: "等待安装任务输出…",
+  },
+  diffsynthGate: {
+    intro: "Qwen-Image-2.1 LoRA。独立环境；暂不支持训练中采样预览。", auditTitle: "环境检查结果",
+    installWorking: "正在安装…", install: "安装 DiffSynth 环境", consoleIdle: "安装日志", consoleWaiting: "等待安装…",
   },
   musubiGate: {
     intro: "Krea 2 LoRA 训练由 Musubi-Tuner 独立运行环境承载；完成安装与审计后即可开始训练。",
