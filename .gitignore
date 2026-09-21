@@ -92,6 +92,7 @@ plugin-packages/next-trainer-pi-agent/
 
 # Isolated DiffSynth runtime (source and dependencies are installed on demand)
 extensions/diffsynth/
+/extensions/.diffsynth.lock
 
 # Local project memory
 /MEMORY.md
