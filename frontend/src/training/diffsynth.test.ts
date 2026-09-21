@@ -9,6 +9,16 @@ const source = readFileSync(resolve(process.cwd(), "../mikazuki/schema/qwen-imag
 const schema = executeSchemaSources([{ name: "qwen-image-21-lora", hash: "test", schema: source }], "qwen-image-21-lora")
 
 describe("DiffSynth schema uses shared serialization", () => {
+  it("places processor last and supplies one default example without replacing custom samples", () => {
+    const lastSection = schema.sections.at(-1)!
+    expect(lastSection.fields.map(field => field.key)).toContain("processor_path")
+    const defaults = createDefaultModel(schema)
+    const field = schema.sections.flatMap(section => section.fields).find(field => field.key === "preview_samples")!
+    const enabled = serializeModel(schema, { ...defaults, sample_enabled: true })
+    const samples = (enabled.preview_samples ?? field.defaultValue) as string[]
+    expect(samples).toHaveLength(1)
+    expect(JSON.parse(samples[0]).prompt).toBe("1girl, solo, smile, japanese clothes, kimono, blue eyes, closed mouth, upper body, looking at viewer, hair ornament, long hair, yellow kimono, black hair, anime coloring, yukata, choker, split mouth, side ponytail, bow, brown hair")
+  })
   it("preserves the shared Sample contract through the actual training form", () => {
     const preview_samples = encodeSamples([{ ...createSample(), prompt: "中文", seed: 123 }])
     const model = { ...createDefaultModel(schema), sample_enabled: true, preview_samples }

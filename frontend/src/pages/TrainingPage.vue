@@ -7,6 +7,7 @@ import { parse, stringify } from "smol-toml"
 import DynamicSchemaForm from "../components/DynamicSchemaForm.vue"
 import ModelAssetsTools from "../components/ModelAssetsTools.vue"
 import SectionToc from "../components/SectionToc.vue"
+import { formatConfigPreview } from "../training/configPreview"
 import { schemasApi } from "../api/schemas"
 import { trainingApi, type TrainingPreset, type TrainingStart } from "../api/training"
 import { applyReadonlyDefaults, cloneFormModel, cloneFormValue, createDefaultModel, hasFormValue, isFieldActive, normalizeModelForSchema, serializeModel, validateModel, type AdaptedSchema, type FormField, type FormModel } from "../schema/adapter"
@@ -58,6 +59,7 @@ const rawConfig = computed(() => schema.value ? serializeModel(schema.value, mod
 const output = computed(() => buildTrainingConfig(rawConfig.value, props.schemaName))
 const diagnostics = computed(() => checkTrainingConfig(output.value))
 const outputText = computed(() => stringify(output.value))
+const displayOutputText = computed(() => formatConfigPreview(output.value))
 const filteredPresets = computed(() => presets.value.filter((item) => !item.metadata.train_type || item.metadata.train_type === props.schemaName))
 const tocSections = computed(() => {
   if (!schema.value) return []
@@ -389,7 +391,7 @@ onBeforeUnmount(() => {
         <div v-if="!bare" class="panel-copy"><span class="eyebrow">TRAINING CONTROL</span><h2>{{ title }}</h2><p>{{ t("training.panelHint") }}</p></div>
         <div v-if="diagnostics.errors.length || diagnostics.warnings.length" class="param-diagnostics"><p v-for="item in diagnostics.errors" :key="item" class="error">{{ item }}</p><p v-for="item in diagnostics.warnings" :key="item">{{ item }}</p></div>
         <div v-if="started" class="started-task"><strong>{{ t("training.startedTask") }}</strong><code>{{ started.task_id }}</code><a :href="trainLogHref" target="_blank" rel="noreferrer">{{ t("training.openLog") }}</a><RouterLink to="/tasks">{{ t("training.viewTasks") }}</RouterLink></div>
-        <section class="preview-panel" :class="{ collapsed: previewCollapsed }"><header><span>{{ t("training.preview.panelTitle") }}</span><b>{{ t("training.preview.count", { n: Object.keys(output).length }) }}</b><span class="preview-actions"><button class="preview-collapse" :title="previewCollapsed ? t('training.preview.expand') : t('training.preview.collapse')" :aria-label="previewCollapsed ? t('training.preview.expand') : t('training.preview.collapse')" @click="previewCollapsed = !previewCollapsed">{{ previewCollapsed ? "←" : "→" }}</button><button @click="copyToml">{{ t("training.preview.copy") }}</button></span></header><pre v-show="!previewCollapsed">{{ outputText }}</pre></section>
+        <section class="preview-panel" :class="{ collapsed: previewCollapsed }"><header><span>{{ t("training.preview.panelTitle") }}</span><b>{{ t("training.preview.count", { n: Object.keys(output).length }) }}</b><span class="preview-actions"><button class="preview-collapse" :title="previewCollapsed ? t('training.preview.expand') : t('training.preview.collapse')" :aria-label="previewCollapsed ? t('training.preview.expand') : t('training.preview.collapse')" @click="previewCollapsed = !previewCollapsed">{{ previewCollapsed ? "←" : "→" }}</button><button @click="copyToml">{{ t("training.preview.copy") }}</button></span></header><pre v-show="!previewCollapsed" style="white-space: pre-wrap; overflow-wrap: anywhere">{{ displayOutputText }}</pre></section>
         <div class="panel-actions"><button @click="openPresets">{{ t("training.toolbar.presets") }}</button><button @click="saveHistory">{{ t("training.toolbar.save") }}</button><button @click="openImport">{{ t("training.toolbar.import") }}</button><button @click="historyOpen = true">{{ t("training.toolbar.history") }}</button><button @click="exportConfig">{{ t("training.toolbar.export") }}</button><button @click="resetConfig">{{ t("training.toolbar.reset") }}</button></div>
         <button class="secondary-action schema-validate" :disabled="!schema" @click="validate">{{ t("training.validate") }}</button>
         <div class="submit-row"><button class="primary-action train-submit" :disabled="!schema || submitting || diagnostics.errors.length > 0" @click="submit">{{ submitting ? t("training.submitting") : t("training.start") }}</button><button class="danger-action stop-training" :disabled="!currentRunning || Boolean(tasksStore.terminatingId)" @click="stopTraining">{{ tasksStore.terminatingId ? t("tasks.detail.stopping") : t("training.stop") }}</button></div>

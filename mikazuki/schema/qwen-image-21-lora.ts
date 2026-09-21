@@ -16,7 +16,6 @@ Schema.intersect([
         }),
     ]),
     Schema.object({
-        processor_path: Schema.string().role('filepicker', { type: "folder" }).description("Qwen-Image-2.1 Processor 目录；留空时从模型相邻目录查找，不自动下载"),
         dataset_format: Schema.union(["image_text", "metadata"]).default("image_text").description("数据集格式：图片 + TXT / 原生 CSV、JSON、JSONL"),
     }).description("数据集设置"),
     Schema.union([
@@ -60,8 +59,11 @@ Schema.intersect([
         Schema.object({
             sample_enabled: Schema.const(true),
             sample_every_n_steps: Schema.number().min(1).step(1).default(100).description("每 N 次优化器更新预览，与保存步数使用同一口径；失败时任务报错停止"),
-            preview_samples: Schema.array(String).role('preview-samples', { dimensionStep: 32, minGuidance: 1 }).default(['{"prompt":"","width":1024,"height":1024,"seed":42,"guidance_scale":4,"sample_steps":20}']).description("预览样例，可添加多组独立参数"),
+            preview_samples: Schema.array(String).role('preview-samples', { dimensionStep: 32, minGuidance: 1 }).default(['{"prompt":"1girl, solo, smile, japanese clothes, kimono, blue eyes, closed mouth, upper body, looking at viewer, hair ornament, long hair, yellow kimono, black hair, anime coloring, yukata, choker, split mouth, side ponytail, bow, brown hair","width":1024,"height":1024,"seed":42,"guidance_scale":4,"sample_steps":20}']).description("预览样例，可添加多组独立参数"),
         }),
         Schema.object({ sample_enabled: Schema.const(false) }),
     ]),
+    Schema.object({
+        processor_path: Schema.string().role('filepicker', { type: "folder" }).description("模型处理配置目录：一般留空，自动查找；找不到时再选择配套的 processor 文件夹"),
+    }).description("可选模型配置"),
 ])
