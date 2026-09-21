@@ -9,9 +9,17 @@ def sample_config(config):
     enabled = bool(config.get('sample_enabled', False))
     if not enabled:
         return {'enabled': False, 'every_steps': 100, 'samples': []}
-    interval = config.get('sample_every_n_steps', 100)
-    if isinstance(interval, bool) or int(interval) != float(interval) or int(interval) < 1:
-        raise ValueError('sample_every_n_steps 必须为正整数（优化器更新次数）')
+    def positive_interval(value, name):
+        try:
+            if isinstance(value, bool) or int(value) != float(value) or int(value) < 1:
+                raise ValueError()
+            return int(value)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(f'{name} 必须为正整数') from exc
+    raw_epochs = config.get('sample_every_n_epochs')
+    every_epochs = None if raw_epochs is None or str(raw_epochs).strip() == '' else positive_interval(raw_epochs, 'sample_every_n_epochs')
+    # An overridden step interval must not prevent epoch-based previews.
+    interval = 100 if every_epochs is not None else positive_interval(config.get('sample_every_n_steps', 100), 'sample_every_n_steps')
     samples = config.get('preview_samples', [json.dumps(DEFAULT_SAMPLE)])
     if not samples:
         raise ValueError('至少需要一个预览样例')
@@ -38,4 +46,4 @@ def sample_config(config):
             raise ValueError('预览 guidance_scale 必须 >= 1')
         sample['guidance_scale'] = cfg
         result.append(sample)
-    return {'enabled': True, 'every_steps': int(interval), 'samples': result}
+    return {'enabled': True, 'every_steps': interval, 'every_epochs': every_epochs, 'samples': result}

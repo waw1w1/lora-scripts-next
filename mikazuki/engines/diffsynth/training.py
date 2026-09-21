@@ -3,6 +3,7 @@ import copy
 import json
 from pathlib import Path
 import random
+from functools import partial
 
 import numpy as np
 import torch
@@ -11,13 +12,18 @@ from .formats import export_comfy_lora
 
 
 class QwenLogger(ModelLogger):
-    def __init__(self, output_path, samples, output_name):
-        super().__init__(output_path, remove_prefix_in_ckpt='pipe.dit.', state_dict_converter=export_comfy_lora,
+    def __init__(self, output_path, samples, output_name, alpha=None, sample_callback=None, batches_per_epoch=None):
+        super().__init__(output_path, remove_prefix_in_ckpt='pipe.dit.', state_dict_converter=partial(export_comfy_lora, alpha=alpha),
                          enable_csv_log=True, enable_tensorboard_log=True)
         self.samples, self.output_name = samples, output_name
         self.pending_loss, self.microsteps = 0.0, 0
+        self.sample_callback = sample_callback
+        self.batches_seen, self.batches_per_epoch = 0, batches_per_epoch
+        if samples.get('every_epochs') is not None and not batches_per_epoch:
+            raise ValueError('按 epoch 预览需要实际每轮 batch 数')
 
     def on_step_end(self, accelerator, model, save_steps=None, **kwargs):
+        self.batches_seen += 1
         self.pending_loss += float(kwargs['loss'].detach().float())
         self.microsteps += 1
         if not accelerator.sync_gradients:
@@ -27,8 +33,19 @@ class QwenLogger(ModelLogger):
         if accelerator.optimizer_step_was_skipped:
             return
         super().on_step_end(accelerator, model, save_steps, loss=loss)
-        if self.samples['enabled'] and self.num_steps % self.samples['every_steps'] == 0:
-            self.sample(accelerator.unwrap_model(model))
+        if hasattr(self, 'last_learning_rate'):
+            for metric_logger in self.loggers:
+                metric_logger.log('learning_rate', self.last_learning_rate, self.num_steps)
+        if self.samples['enabled']:
+            every_epochs = self.samples.get('every_epochs')
+            if every_epochs is not None:
+                epoch_end = self.batches_seen % self.batches_per_epoch == 0
+                epoch = self.batches_seen // self.batches_per_epoch
+                due = epoch_end and epoch % every_epochs == 0
+            else:
+                due = self.num_steps % self.samples['every_steps'] == 0
+            if due:
+                self.sample(accelerator.unwrap_model(model))
 
     def save_model(self, accelerator, model, file_name):
         super().save_model(accelerator, model, self.output_name + '-' + file_name)
@@ -53,8 +70,11 @@ class QwenLogger(ModelLogger):
                 pipe.scheduler = copy.deepcopy(scheduler)
                 model.eval()
                 for index, sample in enumerate(self.samples['samples']):
-                    image = pipe(prompt=sample['prompt'], width=sample['width'], height=sample['height'], seed=sample['seed'],
-                                 cfg_scale=sample['guidance_scale'], num_inference_steps=sample['sample_steps'], tiled=True)
+                    if self.sample_callback is not None:
+                        image = self.sample_callback(model, sample)
+                    else:
+                        image = pipe(prompt=sample['prompt'], width=sample['width'], height=sample['height'], seed=sample['seed'],
+                                     cfg_scale=sample['guidance_scale'], num_inference_steps=sample['sample_steps'], tiled=True)
                     path = directory / f'{self.output_name}-step-{self.num_steps:08d}-sample-{index + 1:02d}.png'
                     temporary = path.with_suffix('.tmp')
                     image.save(temporary, format='PNG')

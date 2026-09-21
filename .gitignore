@@ -92,3 +92,13 @@ plugin-packages/next-trainer-pi-agent/
 
 # Isolated DiffSynth runtime (source and dependencies are installed on demand)
 extensions/diffsynth/
+
+# Local project memory
+/MEMORY.md
+
+# Local Qwen-Image-2.1 processor assets
+/qwen-image-2.1-processor/
+/tokenizer-cache/
+
+# Generated frontend assets (existing tracked release assets remain tracked)
+/frontend/dist/

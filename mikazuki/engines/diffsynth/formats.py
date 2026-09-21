@@ -5,6 +5,7 @@ No model implementation is copied from either trainer.
 """
 import hashlib
 import re
+import math
 
 MODEL_HASHES = {
     'dit_path': '4c9f4f5bdeb5c737742ad8e4080221d1',
@@ -62,8 +63,8 @@ def conversion_plan(headers, component):
     return plan
 
 
-def export_comfy_lora(state_dict):
-    """PEFT default adapter -> Comfy's native lora_A/B format; alpha=rank.
+def export_comfy_lora(state_dict, alpha=None):
+    """PEFT default adapter -> Comfy's native lora_A/B and optional alpha tensors.
 
     Keep gate_layer/proj separate: Comfy's QwenImage mapping applies each LoRA
     to the corresponding half of its fused gate_up weight.
@@ -84,4 +85,26 @@ def export_comfy_lora(state_dict):
                 raise ValueError(f'LoRA 矩阵尺寸不匹配: {base}')
     if sum(k.endswith('.lora_A.weight') for k in result) * 2 != len(result):
         raise ValueError('LoRA A/B 权重不成对')
+    if alpha is not None:
+        import torch
+        for key in list(result):
+            if key.endswith('.lora_A.weight'):
+                result[key.removesuffix('.lora_A.weight') + '.alpha'] = torch.tensor(float(alpha))
     return result
+
+
+def prepare_lora_checkpoint(weights, rank, alpha):
+    """Keep the effective LoRA delta when resuming with a different alpha."""
+    weights = {k.replace('.lora_A.default.', '.lora_A.').replace('.lora_B.default.', '.lora_B.'): v
+               for k, v in weights.items()}
+    for key in list(weights):
+        if key.endswith('.lora_B.weight'):
+            base = key.removesuffix('.lora_B.weight')
+            source_rank = weights[base + '.lora_A.weight'].shape[0]
+            if source_rank != rank:
+                raise ValueError('继续训练的 LoRA Rank 与当前配置不一致')
+            source_alpha = float(weights.get(base + '.alpha', source_rank))
+            if not math.isfinite(source_alpha) or source_alpha <= 0:
+                raise ValueError('LoRA 文件中的 Alpha 必须为有限正数')
+            weights[key] = weights[key] * (source_alpha / alpha)
+    return {k: v for k, v in weights.items() if not k.endswith('.alpha')}

@@ -39,7 +39,8 @@ def _handle_run(config, ctx):
             "output_dir": str(adapted.output_path), "output_name": config["output_name"],
             "logging_dir": str(adapted.output_path / "tensorboard_log"),
             "command": spec.command,
-            "total_steps": math.ceil(len(adapted.dataset) * adapted.arguments["dataset_repeat"] / adapted.arguments["gradient_accumulation_steps"]) * adapted.arguments["num_epochs"],
+            "total_steps": adapted.engine['lr_schedule']['total_steps'],
+            "bucket_summary": adapted.engine.get('bucket_summary', []),
             "warnings": ["保存的检查点为 LoRA 权重，不含优化器状态。"],
         }
         task = tm.create_task(spec.command, spec.env, metadata=metadata, cwd=str(spec.cwd))

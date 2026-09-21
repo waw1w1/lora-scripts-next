@@ -127,13 +127,8 @@ def model_inputs(config, root):
     if mode == 'directory':
         directory = required_path(config, 'diffsynth_model_dir', root)
         selected = [('dit_path', directory / 'transformer'), ('text_encoder_path', directory / 'text_encoder'), ('vae_path', directory / 'vae')]
-        processor_roots = [directory / 'processor', directory]
     elif mode == 'components':
         selected = [(key, required_path(config, key, root)) for key in ('dit_path', 'text_encoder_path', 'vae_path')]
-        processor_roots = []
-        for _, path in selected:
-            parent = path if path.is_dir() else path.parent
-            processor_roots += [parent / 'processor', parent.parent / 'processor', parent]
     else:
         raise InputError('model_input_mode', '未知模型输入模式')
     models = []
@@ -145,25 +140,10 @@ def model_inputs(config, root):
         except ValueError as exc:
             raise InputError(key, str(exc), path) from exc
         models.append({'component': key, 'files': [str(p) for p in files], 'conversion': plan})
-    if config.get('processor_path'):
-        processor = required_path(config, 'processor_path', root)
-    else:
-        matches = {p.resolve() for p in processor_roots if all((p / n).is_file() for n in PROCESSOR_FILES)}
-        if len(matches) != 1:
-            raise InputError('processor_path', '未找到唯一完整的 Processor，请手动选择目录')
-        processor = matches.pop()
-    for name in PROCESSOR_FILES:
-        if not (processor / name).is_file():
-            raise InputError('processor_path', f'缺少 {name}', processor)
-        contents = (processor / name).read_text(encoding='utf-8')
-        if not contents.strip():
-            raise InputError('processor_path', f'{name} 为空', processor)
-        if name.endswith('.json'):
-            try:
-                json.loads(contents)
-            except ValueError as exc:
-                raise InputError('processor_path', f'{name} 不是有效 JSON', processor) from exc
-    return models, processor
+    from .processor import processor_directory
+    # Preparation runs in the queued training child, with progress in its log.
+    # Legacy UI processor_path values no longer override the managed location.
+    return models, processor_directory(root)
 
 
 def dataset_inputs(config, root):
