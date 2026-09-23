@@ -212,6 +212,13 @@ def reference_paths(value, base, field, checked=None, *, max_pixels=None, target
 
 def dataset_inputs(config, root):
     editing = is_edit(config)
+    if editing:
+        # The UI uses output/input terminology for Edit mode while the
+        # backend keeps the original dataset contract for compatibility.
+        if config.get("output_data_dir") and not config.get("train_data_dir"):
+            config = {**config, "train_data_dir": config["output_data_dir"]}
+        if config.get("input_data_dirs") is not None and config.get("control_data_dirs") is None:
+            config = {**config, "control_data_dirs": config["input_data_dirs"]}
     checked = {}
     max_pixels = None
     if editing:

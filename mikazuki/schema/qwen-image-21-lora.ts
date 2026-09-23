@@ -20,29 +20,36 @@ Schema.intersect([
         dataset_format: Schema.union(["image_text", "metadata"]).default("image_text").description("数据集格式：图片 + TXT / 原生 CSV、JSON、JSONL"),
     }).description("数据集设置"),
     Schema.union([
-        Schema.object({
-            dataset_format: Schema.const("image_text"),
-            train_data_dir: Schema.string().role('filepicker', { type: "folder", internal: "train-dir" }).default("./train/qwen-image-21").required().description("图片与同名 TXT；支持 重复次数_概念名 子目录，普通目录和根目录图片均保留"),
-            dataset_repeat: Schema.number().min(1).step(1).default(1).description("全局重复次数，与子目录重复次数相乘"),
-        }),
-        Schema.object({
-            dataset_format: Schema.const("metadata"),
-            dataset_base_path: Schema.string().role('filepicker', { type: "folder" }).required().description("元数据中图片相对路径的根目录"),
-            dataset_metadata_path: Schema.string().role('filepicker', { type: "file", filter: "*.csv;*.json;*.jsonl" }).required().description("包含 image（目标图）、prompt（指令）；Edit 另需 edit_image（参考图路径或路径数组）；不按文件夹名重复"),
-        }),
-    ]),
-    Schema.union([
         Schema.intersect([
             Schema.object({ training_task: Schema.const("image-edit") }),
             Schema.union([
                 Schema.object({
                     dataset_format: Schema.const("image_text"),
-                    control_data_dirs: Schema.array(String).role('reference-paths').default([]).required().description("参考图目录，可添加多组；按目标图的相对目录与同名文件匹配（扩展名可不同）。与目标图目录互不包含；TXT 写编辑指令"),
+                    output_data_dir: Schema.string().role('filepicker', { type: "folder", internal: "train-dir" }).default("./train/qwen-image-21/edit-output").required().description("输出图目录：包含目标图与同名 TXT 编辑指令"),
+                    input_data_dirs: Schema.array(String).role('reference-paths').default([]).required().description("输入图目录，可添加多组；按输出图的相对目录与同名文件匹配"),
                 }),
-                Schema.object({ dataset_format: Schema.const("metadata") }),
+                Schema.object({
+                    dataset_format: Schema.const("metadata"),
+                    dataset_base_path: Schema.string().role('filepicker', { type: "folder" }).required().description("元数据中输出图与输入图的相对路径根目录"),
+                    dataset_metadata_path: Schema.string().role('filepicker', { type: "file", filter: "*.csv;*.json;*.jsonl" }).required().description("包含 image（输出图）、prompt（编辑指令）和 edit_image（输入图路径或路径数组）"),
+                }),
             ]),
         ]),
-        Schema.object({ training_task: Schema.const("text-to-image") }),
+        Schema.intersect([
+            Schema.object({ training_task: Schema.const("text-to-image") }),
+            Schema.union([
+                Schema.object({
+                    dataset_format: Schema.const("image_text"),
+                    train_data_dir: Schema.string().role('filepicker', { type: "folder", internal: "train-dir" }).default("./train/qwen-image-21").required().description("图片与同名 TXT；支持 重复次数_概念名 子目录，普通目录和根目录图片均保留"),
+                    dataset_repeat: Schema.number().min(1).step(1).default(1).description("全局重复次数，与子目录重复次数相乘"),
+                }),
+                Schema.object({
+                    dataset_format: Schema.const("metadata"),
+                    dataset_base_path: Schema.string().role('filepicker', { type: "folder" }).required().description("元数据中图片相对路径的根目录"),
+                    dataset_metadata_path: Schema.string().role('filepicker', { type: "file", filter: "*.csv;*.json;*.jsonl" }).required().description("包含 image（目标图）、prompt（指令）；不按文件夹名重复"),
+                }),
+            ]),
+        ]),
     ]),
     Schema.object({
         resolution: Schema.string().default("1024,1024").description("训练图片基准分辨率，宽,高；支持非正方形，宽高必须是 64 倍数。宽×高决定像素面积"),

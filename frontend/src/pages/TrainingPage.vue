@@ -155,6 +155,9 @@ async function load() {
         ? { ...base, ...sanitizePersistedDraft(saved as FormModel, defaults) }
         : base
       model.value = normalizeModelForSchema(loaded, model.value)
+      if (props.schemaName === "qwen-image-21-lora" && model.value.train_data_dir === "./train/aki") {
+        model.value.train_data_dir = "./train/qwen-image-21"
+      }
     } catch { model.value = normalizeModelForSchema(loaded, base) }
     applyReadonlyDefaults(loaded, model.value, defaults)
     const cards = await schemasApi.graphicCards()
