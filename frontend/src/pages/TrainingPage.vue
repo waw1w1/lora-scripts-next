@@ -364,6 +364,11 @@ onBeforeUnmount(() => {
           <div v-if="!bare" class="section-heading"><span>{{ area }}</span><h1>{{ title }}</h1><p>{{ t("training.intro") }}</p></div>
           <input ref="importInput" class="visually-hidden" type="file" accept=".toml,.json" @change="importFile">
           <slot name="form-top" />
+          <div v-if="schemaName === 'qwen-image-21-lora' && schema && !loading" class="qwen-training-mode">
+            <el-button :type="model.training_task !== 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task !== 'image-edit'" :disabled="submitting" @click="model.training_task = 'text-to-image'">文生图 T2I</el-button>
+            <el-button :type="model.training_task === 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task === 'image-edit'" :disabled="submitting" @click="model.training_task = 'image-edit'">Edit 图像编辑</el-button>
+            <p v-if="model.training_task === 'image-edit'">目标图是编辑后的结果，TXT 填写编辑指令；另选参考图目录或在元数据填写 edit_image。Edit 当前 batch size 须为 1，支持梯度累积。</p>
+          </div>
           <div v-if="loading" class="schema-state"><strong>{{ t("training.loadingSchema") }}</strong><span>{{ t("training.loadingSchemaHint") }}</span></div>
           <div v-else-if="error" class="schema-state schema-error"><strong>{{ t("training.schemaError") }}</strong><span>{{ error }}</span><button @click="load">{{ t("training.retry") }}</button></div>
           <DynamicSchemaForm v-else-if="schema" :model-value="model" :schema="schema" :errors="errors" :effective-defaults="effectiveDefaults" @update:model-value="updateModel" @reset-field="resetField">

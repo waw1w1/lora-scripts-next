@@ -341,3 +341,17 @@ describe("TrainingPage Anima Fast imports", () => {
     wrapper.unmount()
   })
 })
+
+
+it("switches Qwen training mode with the Edit button and persists the selection", async () => {
+  const wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  const buttons = wrapper.findAll(".qwen-training-mode el-button")
+  expect(buttons).toHaveLength(2)
+  await buttons[1].trigger("click")
+  expect(JSON.parse(wrapper.get(".model").text()).training_task).toBe("image-edit")
+  expect(JSON.parse(localStorage.getItem("configs-qwen-image-21-lora-autosave")!).training_task).toBe("image-edit")
+  await buttons[0].trigger("click")
+  expect(JSON.parse(wrapper.get(".model").text()).training_task).toBe("text-to-image")
+  wrapper.unmount()
+})

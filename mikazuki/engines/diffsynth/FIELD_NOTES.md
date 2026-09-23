@@ -1,3 +1,24 @@
+# Edit adaptation validation
+
+The `qwen2.1-image-edit` branch adds Edit to the existing Qwen 2.1 schema and
+DiffSynth entry; the older report below describes the original T2I revision.
+
+- Uses the same pinned upstream commit and official `extra_inputs=edit_image`.
+- Reuses reference-path, preview, config, task and dry-run interfaces.
+- New CPU tests cover multi-reference metadata/folder pairing, config round-trip,
+  cache reuse/invalidation, conditioned positive/negative preview cache, real
+  upstream parser/dataset/training-input/model-function contracts, and dry-run HTTP.
+  Cache encoder tests use synthetic stand-ins, not the real 8B encoder or VAE.
+- Frontend checks cover mode buttons, draft persistence, conditional reference
+  fields, T2I serialization and existing shared controls.
+- Edit batch size is explicitly limited to 1. Gradient accumulation is supported.
+- No real GPU training, trained LoRA quality, or ComfyUI image-generation acceptance
+  was performed. The unchanged dev base already fails
+  `test_comfy_component_mode_and_processor_errors`: it expects local Processor
+  validation despite the newer managed Processor preparation path.
+
+---
+
 # DiffSynth review validation
 
 This revision supersedes the original PR smoke report. Only Qwen-Image-2.1 BF16

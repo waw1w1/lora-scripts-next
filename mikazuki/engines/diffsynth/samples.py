@@ -5,7 +5,7 @@ import math
 DEFAULT_SAMPLE = {'prompt': '', 'width': 1024, 'height': 1024, 'seed': 42, 'guidance_scale': 4, 'sample_steps': 20}
 
 
-def sample_config(config):
+def sample_config(config, root=None):
     enabled = bool(config.get('sample_enabled', False))
     if not enabled:
         return {'enabled': False, 'every_steps': 100, 'samples': []}
@@ -28,7 +28,12 @@ def sample_config(config):
         sample = json.loads(value)
         if not isinstance(sample, dict) or set(sample) - (set(DEFAULT_SAMPLE) | {'controlImages'}):
             raise ValueError(f'预览样例 {i + 1} 包含不支持的参数')
-        if sample.pop('controlImages', []) != []:
+        from .inputs import is_edit, reference_paths
+        from pathlib import Path
+        controls = sample.pop('controlImages', [])
+        if is_edit(config):
+            sample['controlImages'] = reference_paths(controls, Path(root or '.'), f'预览样例 {i + 1}')
+        elif controls != []:
             raise ValueError(f'预览样例 {i + 1}: 文生图不支持参考图，controlImages 必须为空数组')
         sample = {**DEFAULT_SAMPLE, **sample}
         if not isinstance(sample['prompt'], str):

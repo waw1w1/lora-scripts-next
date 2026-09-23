@@ -99,7 +99,22 @@ export function buildTrainingConfig(source: FormModel, schemaName: string) {
   const config: FormModel = schemaName === "lora-basic" ? { ...BASIC_DEFAULTS, ...cloneFormModel(source) } : cloneFormModel(source)
   const lockedTrainType = SCHEMA_TRAIN_TYPES[schemaName]
   if (lockedTrainType) config.model_train_type = lockedTrainType
-  if (schemaName === "qwen-image-21-lora") return config
+  if (schemaName === "qwen-image-21-lora") {
+    // Keep Edit references in the draft while omitting them from T2I requests.
+    if (config.training_task !== "image-edit" && Array.isArray(config.preview_samples)) {
+      config.preview_samples = config.preview_samples.map(value => {
+        if (typeof value !== "string") return value
+        try {
+          const sample = JSON.parse(value)
+          if (sample && typeof sample === "object" && "controlImages" in sample) {
+            return JSON.stringify({ ...sample, controlImages: [] })
+          }
+        } catch { /* Preserve malformed samples for the existing validation path. */ }
+        return value
+      })
+    }
+    return config
+  }
   let networkArgs: string[] = []
   let optimizerArgs: string[] = []
 

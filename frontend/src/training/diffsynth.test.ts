@@ -41,3 +41,19 @@ describe("DiffSynth schema uses shared serialization", () => {
     expect(switched).not.toHaveProperty("dataset_metadata_path")
   })
 })
+
+it("round-trips Edit inputs and hides reference directories in T2I or metadata mode", () => {
+  const model = { ...createDefaultModel(schema), training_task: "image-edit", dataset_format: "image_text",
+    control_data_dirs: ["/refs/first", "/refs/second"], sample_enabled: true,
+    preview_samples: encodeSamples([{ ...createSample(), controlImages: ["/refs/a.png"] }]) }
+  const serialize = () => buildTrainingConfig(serializeModel(schema, model), "qwen-image-21-lora")
+  expect(serialize()).toMatchObject({ training_task: "image-edit", control_data_dirs: model.control_data_dirs, preview_samples: model.preview_samples })
+  model.dataset_format = "metadata"
+  expect(serialize()).not.toHaveProperty("control_data_dirs")
+  model.dataset_format = "image_text"
+  model.training_task = "text-to-image"
+  expect(serialize()).not.toHaveProperty("control_data_dirs")
+  expect(JSON.parse((serialize().preview_samples as string[])[0]).controlImages).toEqual([])
+  model.training_task = "image-edit"
+  expect(serialize().control_data_dirs).toEqual(["/refs/first", "/refs/second"])
+})

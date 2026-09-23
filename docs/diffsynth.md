@@ -1,6 +1,6 @@
 # DiffSynth-Studio / Qwen-Image-2.1 LoRA
 
-仅开放 Qwen-Image-2.1 **BF16 文生图 LoRA**，不包含 Edit、量化权重、全量微调或多卡。
+支持 Qwen-Image-2.1 **BF16 文生图 / Edit LoRA**，不包含量化权重、全量微调或多卡。
 完整 DiffSynth-Studio 固定在 `7686e54d41d25c0e8ed5f1318acc23b6bb832654`，不修改其源码。
 模型、优化器和训练循环使用上游实现；适配层负责输入转换、Kohya 兼容分桶组批、调度器选择、任务管理和 logger 回调。
 
@@ -68,9 +68,9 @@ Comfy-Org BF16 文件与 DiffSynth 原生布局并非完全相同：
 
 ## 预览
 
-复用作者 `feat/ai-toolkit-klein` 分支的 PreviewSampleField 交互，首版裁剪为文生图字段。
+复用已有 PreviewSampleField 和 ReferencePathsField 交互；Edit 模式显示参考图选择。
 开启后默认一组，可增删；每组独立设置 prompt、width、height、seed、guidance_scale、sample_steps。
-不暴露采样器切换、参考图或网络倍率等本适配未实现的选项。
+Edit 的每个预览样例必须选择至少一张参考图，可添加多张；不暴露采样器切换或网络倍率。
 
 预览在上游 logger 的优化器更新回调中调用现有 pipeline，不复制训练循环。
 图片保存到本次输出目录的 `sample/`，复用任务页现有图片、缩略图与预览 API。
@@ -160,3 +160,32 @@ BucketManager/make_bucket_resolutions 规则选桶：最接近宽高比、等比
 后端：`pytest tests/test_diffsynth_engine.py tests/test_diffsynth_review.py -q`。
 上游回调和入口烟测需要 DiffSynth 依赖及固定源码；`test_diffsynth_comfy.py` 另需原版 ComfyUI 及其依赖。
 具体证据与剩余验收项见 `mikazuki/engines/diffsynth/FIELD_NOTES.md`。
+
+
+## Edit 图像编辑训练
+
+在 Qwen-Image-2.1 训练页点击 **Edit 图像编辑**，模型路径和其他训练参数继续复用。
+点击 **文生图 T2I** 可切回；自动草稿、导入导出、任务重新编辑均保存 `training_task`。
+切回 T2I 时提交参数自动清空预览参考图，草稿仍保留，切回 Edit 可继续使用。
+两种模式共用同一套 Qwen-Image-2.1 模型及 ComfyUI LoRA 导出逻辑。
+
+- 图片 + TXT：训练目录放**编辑后的目标图**，同名 TXT 写编辑指令。另选一个或多个
+  参考图目录，按相对目录及文件主名配对，扩展名可以不同。例：目标
+  `targets/3_character/001.png` 对应 `refs/3_character/001.jpg`。
+  两个目录必须互不包含；缺失或同名多候选在提交时明确报错。重复次数沿用原规则。
+- 元数据：保留 `image`（目标图）、`prompt`（指令），增加 `edit_image`，支持单个路径
+  或有序路径数组。JSON / JSONL 示例：
+  `{"image":"target.png","prompt":"把衣服改成蓝色","edit_image":["source.png"]}`。
+  CSV 多图单元格填写 JSON 数组，按标准 CSV 引号规则转义。相对路径以数据集根目录为基准。
+  适配器会生成规范化副本，不修改原元数据。
+- Edit 当前真实 `train_batch_size` 必须为 **1**；可增加 `gradient_accumulation_steps`。
+  现有文生图 batch 的共享位置掩码不能直接用于不同参考图，提交时拒绝 Edit batch > 1。
+- 支持多参考图、预编码缓存、梯度检查点、CPU 卸载和带参考图的训练预览。
+  与文生图一样，CPU 卸载与预览同时开启需要预编码缓存。
+- 目标图沿用分桶；参考图通过上游默认图像操作器后，由上游 Edit 单元按目标面积缩放。
+  预编码文本特征包含参考图视觉信息，VAE 缓存同时包含目标图及参考图 latent。
+  缓存键包含参考图顺序、路径、大小、修改时间及尺寸处理参数；预览正负提示词也分别结合参考图编码。
+
+底层传入官方 `data_file_keys=image,edit_image`、`extra_inputs=edit_image`，
+继续使用固定上游训练模块和损失函数。新增测试验证配对、配置往返、缓存隔离与失效、
+上游输入契约和前端切换；**本环境没有真实 GPU 权重训练验收**，仍需在本地显卡上验证训练及 ComfyUI 出图。
