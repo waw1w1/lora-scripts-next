@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from mikazuki.dataset_editor import IMAGE_EXTENSIONS
+from mikazuki.datasets.locks import dataset_operation
 from mikazuki.datasets.sandbox import resolve_dataset_dir
 
 TRASH_DIRNAME = ".trash"
@@ -161,6 +162,25 @@ def _batch_dir(datasets_root: Path, batch_id: str) -> Path:
     return batch_dir
 
 
+def _move_no_overwrite(source: Path, target: Path) -> bool:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(source, target)
+    except FileExistsError:
+        return False
+    except OSError:
+        try:
+            with source.open("rb") as src, target.open("xb") as out:
+                shutil.copyfileobj(src, out)
+        except FileExistsError:
+            return False
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+    source.unlink()
+    return True
+
+
 def restore_batch(datasets_root: Path, dataset_dir: Path, batch_id: str) -> dict:
     batch_dir = _batch_dir(datasets_root, batch_id)
     manifest = _load_manifest(batch_dir) or {}
@@ -180,9 +200,11 @@ def restore_batch(datasets_root: Path, dataset_dir: Path, batch_id: str) -> dict
             conflicts.append(rel)
             remaining.append(rel)
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(source), str(target))
-        restored.append(rel)
+        if _move_no_overwrite(source, target):
+            restored.append(rel)
+        else:
+            conflicts.append(rel)
+            remaining.append(rel)
     if remaining:
         manifest["entries"] = remaining
         (batch_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -248,8 +270,9 @@ def restore_batch_by_id(datasets_root: Path, batch_id: str) -> dict:
     manifest = _load_manifest(batch_dir) or {}
     dataset_name = manifest.get("dataset") or ""
     dataset_dir = resolve_dataset_dir(datasets_root, dataset_name)
-    dataset_dir.mkdir(parents=True, exist_ok=True)
-    result = restore_batch(datasets_root, dataset_dir, batch_id)
+    with dataset_operation(dataset_name):
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        result = restore_batch(datasets_root, dataset_dir, batch_id)
     result["dataset"] = dataset_name
     return result
 

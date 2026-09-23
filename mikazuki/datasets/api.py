@@ -6,6 +6,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 from mikazuki.app.models import APIResponseSuccess
 from mikazuki.datasets.export import file_download_response, stream_dataset_zip
 from mikazuki.datasets.listing import list_datasets
+from mikazuki.datasets.locks import dataset_operation
 from mikazuki.datasets.root import (
     DEFAULT_DATASETS_ROOT,
     get_datasets_root,
@@ -133,12 +134,13 @@ async def download_dataset(name: str):
 async def create(req: DatasetCreateRequest):
     root = get_datasets_root()
     dataset_dir = resolve_dataset_dir(root, req.name)
-    if dataset_dir.exists():
-        raise HTTPException(status_code=409, detail="dataset already exists")
-    try:
-        dataset_dir.mkdir(parents=True)
-    except OSError as exc:
-        raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
+    with dataset_operation(dataset_dir.name):
+        if dataset_dir.exists():
+            raise HTTPException(status_code=409, detail="dataset already exists")
+        try:
+            dataset_dir.mkdir(parents=True)
+        except OSError as exc:
+            raise HTTPException(status_code=400, detail=f"cannot create dataset: {exc}") from exc
     invalidate_overview(dataset_dir)
     return APIResponseSuccess(data={"name": dataset_dir.name, "path": normalize_path(dataset_dir)})
 
@@ -159,7 +161,8 @@ async def trash_list(name: str):
 @router.post("/datasets/{name}/trash/restore")
 async def trash_restore(name: str, req: TrashRestoreRequest):
     dataset_dir = existing_dataset_dir(name)
-    result = restore_batch(get_datasets_root(), dataset_dir, req.id)
+    with dataset_operation(dataset_dir.name):
+        result = restore_batch(get_datasets_root(), dataset_dir, req.id)
     if result["restored"]:
         invalidate_overview(dataset_dir)
     return APIResponseSuccess(data=result)
@@ -170,7 +173,9 @@ async def trash_empty(name: str, req: TrashEmptyRequest):
     dataset_dir = existing_dataset_dir(name)
     if not req.confirm:
         raise HTTPException(status_code=400, detail="emptying the trash requires confirm=true")
-    return APIResponseSuccess(data=empty_trash(get_datasets_root(), dataset_dir.name, req.id))
+    with dataset_operation(dataset_dir.name):
+        result = empty_trash(get_datasets_root(), dataset_dir.name, req.id)
+    return APIResponseSuccess(data=result)
 
 
 @router.delete("/datasets/{name}/files")
@@ -178,7 +183,8 @@ async def delete_files(name: str, req: DeleteFilesRequest):
     dataset_dir = existing_dataset_dir(name)
     if not req.paths:
         raise HTTPException(status_code=400, detail="no paths given")
-    result = soft_delete(get_datasets_root(), dataset_dir, req.paths)
+    with dataset_operation(dataset_dir.name):
+        result = soft_delete(get_datasets_root(), dataset_dir, req.paths)
     if result["deleted"]:
         invalidate_overview(dataset_dir)
     return APIResponseSuccess(data=result)
@@ -187,7 +193,8 @@ async def delete_files(name: str, req: DeleteFilesRequest):
 @router.delete("/datasets/{name}")
 async def delete_dataset(name: str):
     dataset_dir = existing_dataset_dir(name)
-    result = soft_delete_dataset(get_datasets_root(), dataset_dir)
+    with dataset_operation(dataset_dir.name):
+        result = soft_delete_dataset(get_datasets_root(), dataset_dir)
     invalidate_overview(dataset_dir)
     return APIResponseSuccess(data=result)
 
@@ -299,13 +306,16 @@ async def upload(name: str, request: Request):
             target = resolve_upload_target(dataset_dir, rel)
             moves.append((staged, target))
 
-        ensure_capacity(dataset_dir, moves)
-        overwrite = conflict == "overwrite"
-        for staged, target in moves:
-            if move_staged(staged, target, overwrite):
-                succeeded.append(relative_of(dataset_dir, target))
-            else:
-                skipped.append(relative_of(dataset_dir, target))
+        with dataset_operation(dataset_dir.name):
+            if not dataset_dir.is_dir():
+                raise HTTPException(status_code=409, detail="dataset was removed during upload")
+            ensure_capacity(dataset_dir, moves)
+            overwrite = conflict == "overwrite"
+            for staged, target in moves:
+                if move_staged(staged, target, overwrite):
+                    succeeded.append(relative_of(dataset_dir, target))
+                else:
+                    skipped.append(relative_of(dataset_dir, target))
     finally:
         cleanup_staging(staging)
 
