@@ -281,13 +281,19 @@ def empty_trash_any(datasets_root: Path, batch_id: str | None = None) -> dict:
     removed = 0
     if batch_id:
         batch_dir = _batch_dir(datasets_root, batch_id)
-        _ensure_sealed(_load_manifest(batch_dir) or {})
-        shutil.rmtree(batch_dir, ignore_errors=True)
+        manifest = _load_manifest(batch_dir) or {}
+        dataset_name = manifest.get("dataset") or ""
+        with dataset_operation(dataset_name):
+            batch_dir = _batch_dir(datasets_root, batch_id)
+            _ensure_sealed(_load_manifest(batch_dir) or {})
+            shutil.rmtree(batch_dir, ignore_errors=True)
         removed = 1
     else:
         for batch in list_all_trash(datasets_root):
-            batch_dir = trash_root(datasets_root) / batch["id"]
-            _ensure_sealed(_load_manifest(batch_dir) or {})
-            shutil.rmtree(batch_dir, ignore_errors=True)
-            removed += 1
+            dataset_name = batch.get("dataset") or ""
+            with dataset_operation(dataset_name):
+                batch_dir = _batch_dir(datasets_root, batch["id"])
+                _ensure_sealed(_load_manifest(batch_dir) or {})
+                shutil.rmtree(batch_dir, ignore_errors=True)
+                removed += 1
     return {"removed": removed}
