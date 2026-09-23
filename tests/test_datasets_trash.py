@@ -226,3 +226,81 @@ def test_global_empty_trash(workspace):
     result = client.post("/api/datasets-trash/empty", json={"confirm": True}).json()["data"]
     assert result["removed"] == 1
     assert not (root / ".trash").exists() or not list((root / ".trash").iterdir())
+
+
+def _break_second_move(monkeypatch):
+    import mikazuki.datasets.trash as trash_module
+
+    real_move = trash_module.shutil.move
+    calls = {"count": 0}
+
+    def flaky_move(src, dst):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("simulated mid-delete failure")
+        return real_move(src, dst)
+
+    monkeypatch.setattr(trash_module.shutil, "move", flaky_move)
+
+
+def test_soft_delete_mid_failure_leaves_recoverable_batch(workspace, monkeypatch):
+    root, dataset_dir = workspace
+    _break_second_move(monkeypatch)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = delete(client, ["a.png", "sub/b.jpg"])
+    assert response.status_code == 500
+
+    batches = client.get("/api/datasets/ds/trash").json()["data"]["batches"]
+    assert len(batches) == 1
+    batch = batches[0]
+    assert batch["sealed"] is False
+    assert sorted(batch["paths"]) == ["a.png", "a.txt", "sub/b.jpg"]
+
+    moved = list((root / ".trash" / batch["id"] / "files").rglob("*"))
+    assert [p.name for p in moved if p.is_file()] == ["a.png"]
+    assert not (dataset_dir / "a.png").exists()
+    assert (dataset_dir / "a.txt").is_file()
+    assert (dataset_dir / "sub" / "b.jpg").is_file()
+
+    result = client.post("/api/datasets/ds/trash/restore", json={"id": batch["id"]}).json()["data"]
+    assert result["restored"] == ["a.png"]
+    assert result["conflicts"] == []
+    assert sorted(result["missing"]) == ["a.txt", "sub/b.jpg"]
+    assert (dataset_dir / "a.png").read_bytes() == b"png-a"
+    assert (dataset_dir / "a.txt").read_text(encoding="utf-8") == "1girl"
+    assert (dataset_dir / "sub" / "b.jpg").read_bytes() == b"jpg-b"
+
+
+def test_unsealed_batch_cannot_be_emptied(workspace, monkeypatch):
+    root, _dataset_dir = workspace
+    _break_second_move(monkeypatch)
+    client = TestClient(app, raise_server_exceptions=False)
+    delete(client, ["a.png", "sub/b.jpg"])
+    batch = client.get("/api/datasets/ds/trash").json()["data"]["batches"][0]["id"]
+
+    assert client.post("/api/datasets/ds/trash/empty", json={"confirm": True}).status_code == 409
+    assert client.post("/api/datasets/ds/trash/empty", json={"confirm": True, "id": batch}).status_code == 409
+    assert client.post("/api/datasets-trash/empty", json={"confirm": True}).status_code == 409
+    assert client.post("/api/datasets-trash/empty", json={"confirm": True, "id": batch}).status_code == 409
+    assert (root / ".trash" / batch).is_dir()
+
+
+def test_delete_dataset_moves_whole_directory_atomically(workspace):
+    root, dataset_dir = workspace
+    client = TestClient(app)
+
+    data = client.delete("/api/datasets/ds").json()["data"]
+    assert data["batch"] is not None
+    assert sorted(data["deleted"]) == ["a.png", "a.txt", "sub/b.jpg"]
+
+    files_dir = root / ".trash" / data["batch"] / "files"
+    assert (files_dir / "a.png").read_bytes() == b"png-a"
+    assert (files_dir / "sub" / "b.jpg").read_bytes() == b"jpg-b"
+
+    import json
+
+    manifest = json.loads((root / ".trash" / data["batch"] / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["sealed"] is True
+    batches = client.get("/api/datasets-trash").json()["data"]["batches"]
+    assert batches[0]["sealed"] is True

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 import uuid
@@ -48,6 +49,16 @@ def _linked_paths(dataset_dir: Path, rel: str) -> list[str]:
     return paths
 
 
+def _write_manifest(batch_dir: Path, dataset_name: str, entries: list[str], deleted_at: str, sealed: bool) -> None:
+    manifest = {
+        "dataset": dataset_name,
+        "deleted_at": deleted_at,
+        "entries": entries,
+        "sealed": sealed,
+    }
+    (batch_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def soft_delete(datasets_root: Path, dataset_dir: Path, rels: list[str], keep_empty_batch: bool = False) -> dict:
     deleted: list[str] = []
     missing: list[str] = []
@@ -67,6 +78,10 @@ def soft_delete(datasets_root: Path, dataset_dir: Path, rels: list[str], keep_em
 
     batch_id = f"{int(time.time())}-{uuid.uuid4().hex[:8]}"
     batch_dir = trash_root(datasets_root) / batch_id
+    planned = [path.relative_to(dataset_dir).as_posix() for path in targets]
+    deleted_at = datetime.now(tz=timezone.utc).isoformat()
+    batch_dir.mkdir(parents=True, exist_ok=True)
+    _write_manifest(batch_dir, dataset_dir.name, planned, deleted_at, sealed=False)
     entries: list[str] = []
     for path in targets:
         rel = path.relative_to(dataset_dir).as_posix()
@@ -75,13 +90,7 @@ def soft_delete(datasets_root: Path, dataset_dir: Path, rels: list[str], keep_em
         shutil.move(str(path), str(destination))
         entries.append(rel)
         deleted.append(rel)
-    manifest = {
-        "dataset": dataset_dir.name,
-        "deleted_at": datetime.now(tz=timezone.utc).isoformat(),
-        "entries": entries,
-    }
-    batch_dir.mkdir(parents=True, exist_ok=True)
-    (batch_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_manifest(batch_dir, dataset_dir.name, entries, deleted_at, sealed=True)
     return {"batch": batch_id, "deleted": deleted, "missing": missing}
 
 
@@ -114,6 +123,7 @@ def list_trash(datasets_root: Path, dataset_name: str) -> list[dict]:
                 "deleted_at": manifest.get("deleted_at"),
                 "count": len(entries),
                 "paths": entries,
+                "sealed": manifest.get("sealed", True),
             }
         )
     return batches
@@ -138,6 +148,7 @@ def list_all_trash(datasets_root: Path) -> list[dict]:
                 "deleted_at": manifest.get("deleted_at"),
                 "count": len(entries),
                 "paths": entries,
+                "sealed": manifest.get("sealed", True),
             }
         )
     return batches
@@ -180,6 +191,14 @@ def restore_batch(datasets_root: Path, dataset_dir: Path, batch_id: str) -> dict
     return {"restored": restored, "conflicts": conflicts, "missing": missing}
 
 
+def _ensure_sealed(manifest: dict) -> None:
+    if not manifest.get("sealed", True):
+        raise HTTPException(
+            status_code=409,
+            detail="trash batch is from an interrupted deletion; restore it before emptying",
+        )
+
+
 def empty_trash(datasets_root: Path, dataset_name: str, batch_id: str | None = None) -> dict:
     removed = 0
     if batch_id:
@@ -187,21 +206,41 @@ def empty_trash(datasets_root: Path, dataset_name: str, batch_id: str | None = N
         manifest = _load_manifest(batch_dir) or {}
         if manifest.get("dataset") != dataset_name:
             raise HTTPException(status_code=404, detail="trash batch not found")
+        _ensure_sealed(manifest)
         shutil.rmtree(batch_dir, ignore_errors=True)
         removed = 1
     else:
         for batch in list_trash(datasets_root, dataset_name):
-            shutil.rmtree(trash_root(datasets_root) / batch["id"], ignore_errors=True)
+            batch_dir = trash_root(datasets_root) / batch["id"]
+            _ensure_sealed(_load_manifest(batch_dir) or {})
+            shutil.rmtree(batch_dir, ignore_errors=True)
             removed += 1
     return {"removed": removed}
 
 
 def soft_delete_dataset(datasets_root: Path, dataset_dir: Path) -> dict:
-    files = [p for p in sorted(dataset_dir.rglob("*")) if p.is_file()]
-    rels = [p.relative_to(dataset_dir).as_posix() for p in files]
-    result = soft_delete(datasets_root, dataset_dir, rels, keep_empty_batch=True)
-    shutil.rmtree(dataset_dir, ignore_errors=True)
-    return result
+    batch_id = f"{int(time.time())}-{uuid.uuid4().hex[:8]}"
+    batch_dir = trash_root(datasets_root) / batch_id
+    try:
+        batch_dir.mkdir(parents=True)
+        os.rename(dataset_dir, batch_dir / "files")
+    except OSError:
+        shutil.rmtree(batch_dir, ignore_errors=True)
+        files = [p for p in sorted(dataset_dir.rglob("*")) if p.is_file()]
+        rels = [p.relative_to(dataset_dir).as_posix() for p in files]
+        result = soft_delete(datasets_root, dataset_dir, rels, keep_empty_batch=True)
+        shutil.rmtree(dataset_dir, ignore_errors=True)
+        return result
+    files_dir = batch_dir / "files"
+    entries = sorted(p.relative_to(files_dir).as_posix() for p in files_dir.rglob("*") if p.is_file())
+    _write_manifest(
+        batch_dir,
+        dataset_dir.name,
+        entries,
+        datetime.now(tz=timezone.utc).isoformat(),
+        sealed=True,
+    )
+    return {"batch": batch_id, "deleted": entries, "missing": []}
 
 
 def restore_batch_by_id(datasets_root: Path, batch_id: str) -> dict:
@@ -218,10 +257,14 @@ def restore_batch_by_id(datasets_root: Path, batch_id: str) -> dict:
 def empty_trash_any(datasets_root: Path, batch_id: str | None = None) -> dict:
     removed = 0
     if batch_id:
-        shutil.rmtree(_batch_dir(datasets_root, batch_id), ignore_errors=True)
+        batch_dir = _batch_dir(datasets_root, batch_id)
+        _ensure_sealed(_load_manifest(batch_dir) or {})
+        shutil.rmtree(batch_dir, ignore_errors=True)
         removed = 1
     else:
         for batch in list_all_trash(datasets_root):
-            shutil.rmtree(trash_root(datasets_root) / batch["id"], ignore_errors=True)
+            batch_dir = trash_root(datasets_root) / batch["id"]
+            _ensure_sealed(_load_manifest(batch_dir) or {})
+            shutil.rmtree(batch_dir, ignore_errors=True)
             removed += 1
     return {"removed": removed}
