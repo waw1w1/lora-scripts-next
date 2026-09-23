@@ -56,7 +56,6 @@ function overviewOf(entry: DatasetEntry): DatasetOverview | null {
 function statValue(entry: DatasetEntry, field: "file_count" | "captioned_count" | "total_bytes" | "updated_at") {
   const overview = overviewOf(entry)
   if (!overview || overview.state !== "ready") return overview?.state === "error" ? "!" : "…"
-  const value = overview[field]
   if (field === "total_bytes") return formatBytes(overview.total_bytes)
   if (field === "updated_at") return formatTime(overview.updated_at)
   return overview[field] ?? "-"
