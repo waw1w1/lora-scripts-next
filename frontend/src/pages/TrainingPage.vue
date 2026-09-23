@@ -373,9 +373,12 @@ onBeforeUnmount(() => {
           <div v-if="!bare" class="section-heading"><span>{{ area }}</span><h1>{{ title }}</h1><p>{{ t("training.intro") }}</p></div>
           <input ref="importInput" class="visually-hidden" type="file" accept=".toml,.json" @change="importFile">
           <slot name="form-top" />
-          <div v-if="schemaName === 'qwen-image-21-lora' && schema && !loading" class="qwen-training-mode">
-            <el-button :type="model.training_task !== 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task !== 'image-edit'" :disabled="submitting" @click="model.training_task = 'text-to-image'">文生图 T2I</el-button>
-            <el-button :type="model.training_task === 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task === 'image-edit'" :disabled="submitting" @click="model.training_task = 'image-edit'">Edit 图像编辑</el-button>
+          <div v-if="schemaName === 'qwen-image-21-lora' && schema && !loading" class="qwen-training-mode" data-testid="qwen-training-mode">
+            <strong>训练模式</strong>
+            <div class="qwen-training-mode-options" role="group" aria-label="Qwen-Image 2.1 训练模式">
+              <el-button :type="model.training_task !== 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task !== 'image-edit'" :disabled="submitting" @click="model.training_task = 'text-to-image'">文生图 T2I</el-button>
+              <el-button :type="model.training_task === 'image-edit' ? 'primary' : 'default'" :aria-pressed="model.training_task === 'image-edit'" :disabled="submitting" @click="model.training_task = 'image-edit'">Edit 图像编辑</el-button>
+            </div>
             <p v-if="model.training_task === 'image-edit'">实验性 Edit：目标图是编辑后的结果，TXT 填写编辑指令；另选参考图目录或在元数据填写 edit_image。Edit 当前 batch size 须为 1，支持梯度累积。</p>
           </div>
           <div v-if="loading" class="schema-state"><strong>{{ t("training.loadingSchema") }}</strong><span>{{ t("training.loadingSchemaHint") }}</span></div>
