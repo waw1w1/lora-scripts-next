@@ -1,6 +1,6 @@
 Schema.intersect([
     Schema.object({
-        training_task: Schema.union(["text-to-image", "image-edit"]).default("text-to-image").hidden(),
+        training_task: Schema.union(["text-to-image", "image-edit"]).default("text-to-image").role("external-control").hidden(),
         model_train_type: Schema.string().default("qwen-image-21-lora").disabled().description("训练种类"),
         model_input_mode: Schema.union(["directory", "components"]).default("directory").description("模型输入方式：ComfyUI 分组件 / 完整模型目录；Qwen-Image-2.1 BF16 文生图 / Edit 共用同一套模型"),
     }).description("训练用模型"),

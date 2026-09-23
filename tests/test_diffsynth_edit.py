@@ -215,3 +215,111 @@ def test_existing_dry_run_api_emits_edit_contract(configured, monkeypatch):
     response = client.post('/api/engines/diffsynth/dry-run', json={**config, 'control_data_dirs': []}).json()
     assert response['status'] != 'success'
     assert '参考图目录' in response['message']
+
+
+@pytest.mark.parametrize('count', [128, 512])
+def test_reference_index_scans_each_parent_once(tmp_path, monkeypatch, count):
+    targets = tmp_path / 'targets'
+    controls = [tmp_path / 'refs-b', tmp_path / 'refs-a']
+    directories = ['', '2_nested']
+    for base in [targets, *controls]:
+        for directory in directories:
+            (base / directory).mkdir(parents=True, exist_ok=True)
+    for i in range(count):
+        relative = Path(directories[i % 2]) / f'{i:04d}'
+        Image.new('RGB', (32, 32)).save((targets / relative).with_suffix('.png'))
+        (targets / relative).with_suffix('.txt').write_text('edit')
+        for base in controls:
+            Image.new('RGB', (32, 32)).save((base / relative).with_suffix('.webp'))
+    original = Path.glob
+    scans, candidates = [], []
+    def counted(path, pattern, *args, **kwargs):
+        if pattern == '*' and any(path == base or path.is_relative_to(base) for base in controls):
+            scans.append(path)
+            entries = list(original(path, pattern, *args, **kwargs))
+            candidates.extend(entries)
+            return iter(entries)
+        return original(path, pattern, *args, **kwargs)
+    monkeypatch.setattr(Path, 'glob', counted)
+    config = dict(training_task='image-edit', train_data_dir=str(targets), control_data_dirs=list(map(str, controls)))
+    _, _, rows = dataset_inputs(config, tmp_path)
+    assert len(scans) == 4  # 2 reference groups × 2 parent directories, independent of N.
+    assert len(candidates) == count * 2 + 2  # Files plus one subdirectory per group.
+    assert len(rows) == count * 3 // 2  # Nested files repeated twice.
+    first = rows[0]
+    assert first['edit_image'] == [str((base / first['image']).with_suffix('.webp')) for base in controls]
+    print(f'pairing: targets={count}, scans={len(scans)}, candidates={len(candidates)}')
+    duplicate = (controls[0] / first['image']).with_suffix('.jpg')
+    Image.new('RGB', (32, 32)).save(duplicate)
+    with pytest.raises(ValueError, match='找到 2'):
+        dataset_inputs(config, tmp_path)
+    with pytest.raises(ValueError, match='互不包含'):
+        dataset_inputs({**config, 'control_data_dirs': [str(targets)]}, tmp_path)
+
+
+def test_pinned_encoder_temporary_hooks_are_cleaned_on_success_and_failure():
+    torch = pytest.importorskip('torch')
+    upstream = pytest.importorskip('diffsynth.models.qwen_image_21_text_encoder')
+    from mikazuki.engines.diffsynth.text_encoder_hooks import cleanup_text_encoder_hooks, install_text_encoder_hook_cleanup
+    class TinyHF(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.model = torch.nn.Module()
+            self.model.language_model = torch.nn.Module()
+            self.model.language_model.norm = torch.nn.Identity()
+            self.fail = False
+            self.debug = None
+        def forward(self, input_ids=None, **kwargs):
+            norm = self.model.language_model.norm
+            if self.debug is None:
+                self.debug = norm.register_forward_hook(lambda *_: None)
+            if self.fail:
+                raise RuntimeError('encoding failed')
+            return norm(input_ids)
+    encoder = upstream.QwenImage21TextEncoder.__new__(upstream.QwenImage21TextEncoder)
+    torch.nn.Module.__init__(encoder)
+    encoder.model = TinyHF()
+    norm = encoder.model.model.language_model.norm
+    baseline = norm.register_forward_hook(lambda *_: None)
+    value = torch.randn(1, 3, 4)
+    # Same cleanup used by prepare_cache, with the real pinned forward method.
+    with cleanup_text_encoder_hooks(encoder):
+        assert torch.equal(encoder(input_ids=value), value)
+    assert set(norm._forward_hooks) == {baseline.id, encoder.model.debug.id}
+    install_text_encoder_hook_cleanup(encoder)
+    installed = encoder.forward
+    install_text_encoder_hook_cleanup(encoder)
+    assert encoder.forward is installed
+    for _ in range(32):
+        assert torch.equal(encoder(input_ids=value), value)
+        assert set(norm._forward_hooks) == {baseline.id, encoder.model.debug.id}
+    encoder.model.fail = True
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match='encoding failed'):
+            encoder(input_ids=value)
+        assert set(norm._forward_hooks) == {baseline.id, encoder.model.debug.id}
+    assert 'register_forward_hook' not in norm.__dict__
+
+
+def test_restored_edit_api_task_preserves_engine_arguments(configured, monkeypatch):
+    from fastapi.testclient import TestClient
+    from mikazuki.app.application import app
+    from mikazuki.engines.diffsynth import run
+    from mikazuki.utils.config_import import validate_config_import
+    rt, config = configured
+    config = edit_config(rt, config)
+    monkeypatch.chdir(rt.project_root)
+    monkeypatch.setattr(run, 'check_runtime', lambda _: None)
+    submitted = []
+    monkeypatch.setattr(run.tm, 'submit', submitted.append)
+    config = validate_config_import('qwen-image-21-lora', config)['config']
+    result = TestClient(app).post('/api/run', json=config).json()
+    assert result['status'] == 'success', result
+    task = submitted[0]
+    try:
+        payload = json.loads(Path(task.metadata['engine_config_path']).read_text())
+        assert payload['arguments']['data_file_keys'] == 'image,edit_image'
+        assert payload['arguments']['extra_inputs'] == 'edit_image'
+        assert payload['training_task'] == 'image-edit'
+    finally:
+        run.tm.tasks.pop(task.task_id)

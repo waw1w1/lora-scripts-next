@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { flushPromises, mount } from "@vue/test-utils"
 import { createPinia } from "pinia"
-import { ElMessage } from "element-plus"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { stringify } from "smol-toml"
+import { ElMessage, ElMessageBox } from "element-plus"
 import { defineComponent, type PropType } from "vue"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import Schema from "schemastery"
 import TrainingPage from "./TrainingPage.vue"
 import { i18n } from "../i18n"
-import type { AdaptedSchema } from "../schema/adapter"
+import { executeSchemaSources, type FormModel, type AdaptedSchema } from "../schema/adapter"
 import { loadTrainingSchema } from "../schema/loader"
 import { schemasApi } from "../api/schemas"
 import { tasksApi } from "../api/tasks"
@@ -41,6 +44,7 @@ vi.mock("../api/training", () => ({
     animaFastPreflight: vi.fn(),
     musubiPreflight: vi.fn(),
     aiToolkitPreflight: vi.fn(),
+    diffsynthPreflight: vi.fn(),
   },
 }))
 
@@ -353,5 +357,118 @@ it("switches Qwen training mode with the Edit button and persists the selection"
   expect(JSON.parse(localStorage.getItem("configs-qwen-image-21-lora-autosave")!).training_task).toBe("image-edit")
   await buttons[0].trigger("click")
   expect(JSON.parse(wrapper.get(".model").text()).training_task).toBe("text-to-image")
+  wrapper.unmount()
+})
+
+// Real schema + real page load/import/serialize/submit; only server APIs are mocked.
+const qwenSource = readFileSync(resolve(process.cwd(), "../mikazuki/schema/qwen-image-21-lora.ts"), "utf8")
+function prepareQwen() {
+  vi.mocked(loadTrainingSchema).mockResolvedValue(executeSchemaSources([{ name: "qwen-image-21-lora", hash: "review", schema: qwenSource }], "qwen-image-21-lora"))
+  vi.mocked(trainingApi.validateImport).mockImplementation(async (_name, config) => ({ result: "ok", config }))
+  vi.mocked(trainingApi.diffsynthPreflight).mockResolvedValue({ ok: true, errors: [], warnings: [], facts: {} })
+  vi.mocked(trainingApi.run).mockResolvedValue({ task_id: "edit-test" })
+  vi.mocked(ElMessageBox.confirm).mockResolvedValue("confirm" as Awaited<ReturnType<typeof ElMessageBox.confirm>>)
+}
+function qwenConfig(dataset_format: string): FormModel {
+  return { model_train_type: "qwen-image-21-lora", training_task: "image-edit", diffsynth_model_dir: "D:/models/qwen",
+    dataset_format, train_data_dir: "D:/targets", control_data_dirs: ["D:/refs"], dataset_base_path: "D:/data", dataset_metadata_path: "D:/data/edit.json",
+    output_name: "edit-test", output_dir: "D:/output", train_batch_size: 1, gradient_accumulation_steps: 3, sample_enabled: true,
+    preview_samples: [JSON.stringify({ prompt: "改成蓝色", controlImages: ["D:/preview.png"], width: 512, height: 512, seed: 42, guidance_scale: 4, sample_steps: 20 })] }
+}
+async function assertEditSubmit(wrapper: ReturnType<typeof mountPage>, datasetFormat: string) {
+  expect(JSON.parse(wrapper.get(".model").text()).training_task).toBe("image-edit")
+  expect(wrapper.findAll(".qwen-training-mode el-button")[1].attributes("aria-pressed")).toBe("true")
+  expect(wrapper.get(".train-submit").attributes("disabled")).toBeUndefined()
+  await wrapper.get(".train-submit").trigger("click")
+  await flushPromises()
+  const request = vi.mocked(trainingApi.run).mock.lastCall?.[0]
+  expect(request).toMatchObject({ training_task: "image-edit", model_train_type: "qwen-image-21-lora", dataset_format: datasetFormat, gradient_accumulation_steps: 3 })
+  if (datasetFormat === "image_text") expect(request?.control_data_dirs).toEqual(["D:/refs"])
+  else expect(request).toMatchObject({ dataset_base_path: "D:/data", dataset_metadata_path: "D:/data/edit.json" })
+  expect(JSON.parse((request?.preview_samples as string[])[0]).controlImages).toEqual(["D:/preview.png"])
+}
+
+it.each(["image_text", "metadata"])("restores an Edit autosave and submits it after remount (%s)", async format => {
+  prepareQwen()
+  localStorage.setItem("configs-qwen-image-21-lora-autosave", JSON.stringify(qwenConfig(format)))
+  let wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  wrapper.unmount()
+  wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  await assertEditSubmit(wrapper, format)
+  wrapper.unmount()
+})
+
+it.each(["image_text", "metadata"])("restores the task re-edit pending import and submits Edit (%s)", async format => {
+  prepareQwen()
+  sessionStorage.setItem("mikazuki-pending-import", JSON.stringify(qwenConfig(format)))
+  const wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  await assertEditSubmit(wrapper, format)
+  wrapper.unmount()
+})
+
+it("exports Edit, imports that TOML into a fresh page, and submits Edit", async () => {
+  prepareQwen()
+  localStorage.setItem("configs-qwen-image-21-lora-autosave", JSON.stringify(qwenConfig("image_text")))
+  vi.mocked(trainingApi.normalizeExport).mockImplementation(async (_name, config) => ({ config, warnings: [] }))
+  vi.stubGlobal("URL", { createObjectURL: () => "blob:test", revokeObjectURL: () => {} })
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {})
+  let wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  await wrapper.findAll(".panel-actions button")[4].trigger("click")
+  await flushPromises()
+  const exported = vi.mocked(trainingApi.normalizeExport).mock.lastCall![1]
+  expect(exported.training_task).toBe("image-edit")
+  wrapper.unmount()
+  localStorage.clear()
+  sessionStorage.clear()
+  wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  const input = wrapper.get('input[type="file"]')
+  Object.defineProperty(input.element, "files", { value: [{ name: "edit.toml", text: async () => stringify(exported) }] })
+  await input.trigger("change")
+  await flushPromises()
+  await assertEditSubmit(wrapper, "image_text")
+  wrapper.unmount()
+  vi.unstubAllGlobals()
+})
+
+it("retains references across Edit → T2I → Edit but excludes them from the T2I request", async () => {
+  prepareQwen()
+  localStorage.setItem("configs-qwen-image-21-lora-autosave", JSON.stringify(qwenConfig("image_text")))
+  const wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  const buttons = wrapper.findAll(".qwen-training-mode el-button")
+  await buttons[0].trigger("click")
+  await wrapper.get(".train-submit").trigger("click")
+  await flushPromises()
+  const request = vi.mocked(trainingApi.run).mock.lastCall![0]
+  expect(request.training_task).toBe("text-to-image")
+  expect(request).not.toHaveProperty("control_data_dirs")
+  expect(JSON.parse((request.preview_samples as string[])[0]).controlImages).toEqual([])
+  expect(JSON.parse(wrapper.get(".model").text()).control_data_dirs).toEqual(["D:/refs"])
+  await buttons[1].trigger("click")
+  await assertEditSubmit(wrapper, "image_text")
+  wrapper.unmount()
+})
+
+it("shows live Edit batch and numbered preview errors and clears them when corrected", async () => {
+  prepareQwen()
+  localStorage.setItem("configs-qwen-image-21-lora-autosave", JSON.stringify({ ...qwenConfig("image_text"), training_task: "text-to-image", train_batch_size: 4,
+    preview_samples: ['{"prompt":"one","controlImages":[]}', '{"prompt":"two","controlImages":[" "]}'] }))
+  const wrapper = mountPage("qwen-image-21-lora")
+  await flushPromises()
+  await wrapper.findAll(".qwen-training-mode el-button")[1].trigger("click")
+  expect(wrapper.get(".errors").text()).toContain("train_batch_size")
+  expect(wrapper.get(".errors").text()).toContain("预览样例 1")
+  expect(wrapper.get(".errors").text()).toContain("预览样例 2")
+  expect(wrapper.get(".train-submit").attributes("disabled")).toBeDefined()
+  const form = wrapper.getComponent(DynamicSchemaFormStub)
+  form.vm.$emit("update:modelValue", { ...JSON.parse(wrapper.get(".model").text()), train_batch_size: 1, sample_enabled: false })
+  await flushPromises()
+  expect(wrapper.get(".errors").text()).not.toContain("preview_samples")
+  expect(wrapper.get(".train-submit").attributes("disabled")).toBeUndefined()
   wrapper.unmount()
 })

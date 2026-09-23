@@ -109,6 +109,8 @@ def main():
             from mikazuki.engines.diffsynth.formats import prepare_lora_checkpoint
             model_args['lora_checkpoint'] = prepare_lora_checkpoint(load_file(args.lora_checkpoint), args.lora_rank, alpha)
         model = TrainingModule(**model_args)
+        from mikazuki.engines.diffsynth.text_encoder_hooks import install_text_encoder_hook_cleanup
+        install_text_encoder_hook_cleanup(model.pipe.text_encoder)
         if config.get('cache_embeddings', False):
             model.pipe.units = []
             assert model.pipe.text_encoder is None and model.pipe.vae is None

@@ -1,3 +1,4 @@
+import { validateQwenConfig } from "./qwenValidation"
 import { cloneFormModel, type FormModel, type FormValue } from "../schema/adapter"
 import { i18n } from "../i18n"
 import { parse } from "smol-toml"
@@ -214,7 +215,7 @@ export function hydrateImportedConfig(source: FormModel) {
 
 export function checkTrainingConfig(config: FormModel): ParamDiagnostics {
   const warnings: string[] = []
-  const errors: string[] = []
+  const errors: string[] = config.model_train_type === "qwen-image-21-lora" ? Object.values(validateQwenConfig(config)) : []
   const optimizer = String(config.optimizer_type || "")
   if (optimizer.startsWith("DAdapt") && config.lr_scheduler !== "constant") warnings.push(i18n.global.t("training.diagnostics.dadaptScheduler"))
   if (optimizer.toLowerCase().startsWith("prodigy") && (config.unet_lr !== 1 || config.text_encoder_lr !== 1)) warnings.push(i18n.global.t("training.diagnostics.prodigyLr"))

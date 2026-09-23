@@ -57,3 +57,33 @@ it("round-trips Edit inputs and hides reference directories in T2I or metadata m
   model.training_task = "image-edit"
   expect(serialize().control_data_dirs).toEqual(["/refs/first", "/refs/second"])
 })
+
+it("preserves external-control mode while locking model type and rejecting illegal modes", async () => {
+  const { applyReadonlyDefaults, validateModel } = await import("../schema/adapter")
+  const { checkTrainingConfig } = await import("./params")
+  const defaults = createDefaultModel(schema)
+  const model = { ...defaults, training_task: "image-edit", model_train_type: "other", control_data_dirs: ["D:/refs"] }
+  applyReadonlyDefaults(schema, model, defaults)
+  expect(model.training_task).toBe("image-edit")
+  expect(model.model_train_type).toBe("qwen-image-21-lora")
+  const legacy = { ...defaults }
+  delete legacy.training_task
+  applyReadonlyDefaults(schema, legacy, defaults)
+  expect(legacy.training_task).toBe("text-to-image")
+  for (const invalid of ["edit-typo", "", null]) {
+    const bad = { ...defaults }
+    Object.assign(bad, { training_task: invalid })
+    applyReadonlyDefaults(schema, bad, defaults)
+    expect(validateModel(schema, bad)).toHaveProperty("training_task")
+    expect(checkTrainingConfig(bad).errors.join()).toContain("训练模式无效")
+  }
+})
+
+it("validates Edit preview paths without claiming file existence and allows T2I/disabled previews", async () => {
+  const { checkTrainingConfig } = await import("./params")
+  const base = { model_train_type: "qwen-image-21-lora", training_task: "image-edit", train_batch_size: 1, gradient_accumulation_steps: 4, sample_enabled: true }
+  expect(checkTrainingConfig({ ...base, preview_samples: ['{"controlImages":["D:/not-checked.png"]}'] }).errors).toEqual([])
+  expect(checkTrainingConfig({ ...base, preview_samples: ['{"controlImages":[]}', '{"controlImages":[" "]}'] }).errors.join()).toMatch(/样例 1.*样例 2/)
+  expect(checkTrainingConfig({ ...base, sample_enabled: false, preview_samples: ["broken"] }).errors).toEqual([])
+  expect(checkTrainingConfig({ ...base, training_task: "text-to-image", train_batch_size: 4, preview_samples: ['{"controlImages":[]}'] }).errors).toEqual([])
+})

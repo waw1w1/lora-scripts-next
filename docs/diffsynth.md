@@ -1,6 +1,6 @@
 # DiffSynth-Studio / Qwen-Image-2.1 LoRA
 
-支持 Qwen-Image-2.1 **BF16 文生图 / Edit LoRA**，不包含量化权重、全量微调或多卡。
+支持 Qwen-Image-2.1 **BF16 文生图 LoRA / 实验性 Edit LoRA**，不包含量化权重、全量微调或多卡。
 完整 DiffSynth-Studio 固定在 `7686e54d41d25c0e8ed5f1318acc23b6bb832654`，不修改其源码。
 模型、优化器和训练循环使用上游实现；适配层负责输入转换、Kohya 兼容分桶组批、调度器选择、任务管理和 logger 回调。
 
@@ -189,3 +189,5 @@ BucketManager/make_bucket_resolutions 规则选桶：最接近宽高比、等比
 底层传入官方 `data_file_keys=image,edit_image`、`extra_inputs=edit_image`，
 继续使用固定上游训练模块和损失函数。新增测试验证配对、配置往返、缓存隔离与失效、
 上游输入契约和前端切换；**本环境没有真实 GPU 权重训练验收**，仍需在本地显卡上验证训练及 ComfyUI 出图。
+
+审阅修复及剩余验收范围见 [Qwen Edit 审阅修复记录](qwen-edit-review-fixes.md)。

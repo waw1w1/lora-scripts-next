@@ -137,10 +137,9 @@ def prepare_cache(dataset, paths, args, config, device):
             pipe.device = device
             pipe.text_encoder.to(device).eval()
             unit = QwenImage21Unit_PromptEmbedder()
-            norm = pipe.text_encoder.model.model.language_model.norm
+            from .text_encoder_hooks import cleanup_text_encoder_hooks
             for n, path in enumerate(missing_texts, 1):
-                hooks = set(norm._forward_hooks)
-                try:
+                with cleanup_text_encoder_hooks(pipe.text_encoder):
                     caption, source = texts[path]
                     references = None
                     if isinstance(source, int):
@@ -150,13 +149,9 @@ def prepare_cache(dataset, paths, args, config, device):
                         references = resized_references(pipe, load_references(source['controlImages']), source['width'], source['height'])
                     value = unit.process(pipe, caption, references)
                     write_tensor(path, value)
-                finally:
-                    # Upstream registers a new temporary capture hook on every call.
-                    for key in set(norm._forward_hooks) - hooks:
-                        del norm._forward_hooks[key]
                 del value
                 print(f'[cache TE] {n}/{len(missing_texts)}', flush=True)
-            del norm, unit, pipe
+            del unit, pipe
             release()
             print('[cache] TE released from CPU and GPU', flush=True)
         if missing_images:

@@ -1,3 +1,11 @@
+# Review fixes (2026-09-23)
+
+REV-01 through REV-05 and TEST-01 are addressed; see
+`docs/qwen-edit-review-fixes.md` for implementation and evidence boundaries.
+Edit remains experimental: TEST-02 GPU, native Windows and real ComfyUI output
+acceptance are still outstanding. The older baseline Processor test below has
+been corrected to match managed Processor preparation, without production changes.
+
 # Edit adaptation validation
 
 The `qwen2.1-image-edit` branch adds Edit to the existing Qwen 2.1 schema and

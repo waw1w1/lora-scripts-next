@@ -153,7 +153,7 @@ def is_edit(config):
     return task == 'image-edit'
 
 
-def reference_paths(value, base, field):
+def reference_paths(value, base, field, checked=None):
     # CSV can hold a JSON array; JSON/JSONL also accept a single path.
     if isinstance(value, str):
         value = json.loads(value) if value.lstrip().startswith('[') else [value]
@@ -163,6 +163,9 @@ def reference_paths(value, base, field):
     from PIL import Image
     for item in value:
         path = absolute(item, base)
+        if checked is not None and path in checked:
+            paths.append(str(path))
+            continue
         if not path.is_file():
             raise InputError(field, '参考图不存在', path)
         try:
@@ -170,12 +173,18 @@ def reference_paths(value, base, field):
                 image.verify()
         except (OSError, ValueError) as exc:
             raise InputError(field, '无法读取参考图', path) from exc
+        if checked is not None:
+            checked.add(path)
         paths.append(str(path))
     return paths
 
 
 def dataset_inputs(config, root):
     editing = is_edit(config)
+    checked = set()
+    if editing:
+        from mikazuki.log import log
+        log.info('Edit 数据预检：正在配对并检查参考图。')
     mode = config.get('dataset_format', 'image_text')
     if mode == 'image_text':
         base = required_path(config, 'train_data_dir', root)
@@ -190,6 +199,7 @@ def dataset_inputs(config, root):
             for directory in controls:
                 if not directory.is_dir() or directory == base or directory.is_relative_to(base) or base.is_relative_to(directory):
                     raise InputError('control_data_dirs', '参考图目录必须存在，且与目标图目录互不包含', directory)
+        reference_index = {}
         rows = []
         for image in sorted(base.rglob('*')):
             if not image.is_file() or image.suffix.lower() not in IMAGE_EXTENSIONS:
@@ -208,11 +218,17 @@ def dataset_inputs(config, root):
                 references = []
                 for directory in controls:
                     parent = directory / relative.parent
-                    matches = sorted(p for p in parent.glob('*') if p.is_file() and p.stem == image.stem and p.suffix.lower() in IMAGE_EXTENSIONS)
+                    if parent not in reference_index:
+                        by_stem = {}
+                        for candidate in parent.glob('*'):
+                            if candidate.suffix.lower() in IMAGE_EXTENSIONS and candidate.is_file():
+                                by_stem.setdefault(candidate.stem, []).append(candidate)
+                        reference_index[parent] = by_stem
+                    matches = reference_index[parent].get(image.stem, [])
                     if len(matches) != 1:
                         raise InputError('control_data_dirs', f'参考图须按相对目录及同名文件配对，找到 {len(matches)} 个候选', directory / relative)
                     references.append(str(matches[0]))
-                row['edit_image'] = reference_paths(references, base, 'control_data_dirs')
+                row['edit_image'] = reference_paths(references, base, 'control_data_dirs', checked)
             rows.extend([row] * repeat)
         metadata = None
     elif mode == 'metadata':
@@ -242,10 +258,11 @@ def dataset_inputs(config, root):
         raise InputError('train_data_dir' if mode == 'image_text' else 'dataset_metadata_path', '数据集没有图片')
     if editing:
         for i, row in enumerate(rows):
-            row['edit_image'] = reference_paths(row.get('edit_image'), base, f'edit_image 第 {i + 1} 条')
+            row['edit_image'] = reference_paths(row.get('edit_image'), base, f'edit_image 第 {i + 1} 条', checked)
         # Normalize single paths / CSV arrays to the same upstream JSON contract.
         # Never overwrite the user's metadata.
         metadata = None
+        log.info(f'Edit 数据预检完成：{len(rows)} 条样本（含目录重复），{len(checked)} 张独立参考图。')
     return base, metadata, rows
 
 
