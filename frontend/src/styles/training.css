@@ -587,3 +587,6 @@
 .schema-toc-tab {
   border-radius: var(--radius-sm);
 }
+
+.qwen-training-mode { margin-bottom: 16px; }
+.qwen-training-mode p { margin-top: 10px; line-height: 1.6; }

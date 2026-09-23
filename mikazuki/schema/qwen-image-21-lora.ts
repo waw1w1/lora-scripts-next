@@ -1,7 +1,8 @@
 Schema.intersect([
     Schema.object({
+        training_task: Schema.union(["text-to-image", "image-edit"]).default("text-to-image").role("external-control").hidden(),
         model_train_type: Schema.string().default("qwen-image-21-lora").disabled().description("训练种类"),
-        model_input_mode: Schema.union(["directory", "components"]).default("directory").description("模型输入方式：ComfyUI 分组件 / 完整模型目录；首版仅支持 Qwen-Image-2.1 BF16 文生图"),
+        model_input_mode: Schema.union(["directory", "components"]).default("directory").description("模型输入方式：ComfyUI 分组件 / 完整模型目录；Qwen-Image-2.1 BF16 文生图 / Edit 共用同一套模型"),
     }).description("训练用模型"),
     Schema.union([
         Schema.object({
@@ -27,8 +28,21 @@ Schema.intersect([
         Schema.object({
             dataset_format: Schema.const("metadata"),
             dataset_base_path: Schema.string().role('filepicker', { type: "folder" }).required().description("元数据中图片相对路径的根目录"),
-            dataset_metadata_path: Schema.string().role('filepicker', { type: "file", filter: "*.csv;*.json;*.jsonl" }).required().description("包含 image、prompt 字段的原生元数据；不按文件夹名重复"),
+            dataset_metadata_path: Schema.string().role('filepicker', { type: "file", filter: "*.csv;*.json;*.jsonl" }).required().description("包含 image（目标图）、prompt（指令）；Edit 另需 edit_image（参考图路径或路径数组）；不按文件夹名重复"),
         }),
+    ]),
+    Schema.union([
+        Schema.intersect([
+            Schema.object({ training_task: Schema.const("image-edit") }),
+            Schema.union([
+                Schema.object({
+                    dataset_format: Schema.const("image_text"),
+                    control_data_dirs: Schema.array(String).role('reference-paths').default([]).required().description("参考图目录，可添加多组；按目标图的相对目录与同名文件匹配（扩展名可不同）。与目标图目录互不包含；TXT 写编辑指令"),
+                }),
+                Schema.object({ dataset_format: Schema.const("metadata") }),
+            ]),
+        ]),
+        Schema.object({ training_task: Schema.const("text-to-image") }),
     ]),
     Schema.object({
         resolution: Schema.string().default("1024,1024").description("训练图片基准分辨率，宽,高；支持非正方形，宽高必须是 64 倍数。宽×高决定像素面积"),
@@ -49,7 +63,7 @@ Schema.intersect([
         lr_scheduler: Schema.union(["constant", "linear", "cosine", "cosine_with_restarts"]).default("constant").description("学习率调度：恒定 / 线性衰减 / 余弦衰减 / 余弦重启"),
         lr_warmup_steps: Schema.number().min(0).step(1).default(0).description("学习率预热步数；按优化器更新计数，0 为不预热"),
         optimizer_type: Schema.union(["AdamW", "AdamW8bit"]).default("AdamW").description("优化器；AdamW8bit 使用 8 位优化器状态，降低显存占用"),
-        train_batch_size: Schema.number().min(1).step(1).default(1).description("真实 batch size；相同分辨率桶内组批，尾批保留。大于 1 时需开启预编码缓存"),
+        train_batch_size: Schema.number().min(1).step(1).default(1).description("真实 batch size；Edit 当前仅支持 1（可提高梯度累积）。文生图相同桶内组批，大于 1 时需开启预编码缓存"),
         gradient_accumulation_steps: Schema.number().min(1).step(1).default(1).description("梯度累积步数；每 N 个 batch 更新一次参数"),
         lora_rank: Schema.number().min(1).step(1).default(32).description("LoRA Rank"),
         lora_alpha: Schema.number().min(0.001).description("LoRA Alpha；留空等于 Rank，缩放系数为 Alpha / Rank"),
@@ -66,7 +80,7 @@ Schema.intersect([
         Schema.object({ lr_scheduler: Schema.const("cosine") }),
     ]),
     Schema.object({
-        cache_embeddings: Schema.boolean().default(false).description("预编码缓存：先缓存 TE 文本特征与 VAE 图片 latent，再卸载编码器，仅训练 DiT；预览使用缓存文本并临时加载 VAE"),
+        cache_embeddings: Schema.boolean().default(false).description("预编码缓存：先缓存 TE 文本/参考图特征与 VAE 目标图/参考图 latent，再卸载编码器，仅训练 DiT；预览使用缓存文本并临时加载 VAE"),
         use_gradient_checkpointing: Schema.boolean().default(true).description("梯度检查点，节省显存"),
         use_gradient_checkpointing_offload: Schema.boolean().default(false).description("将梯度检查点卸载到内存"),
         initialize_model_on_cpu: Schema.boolean().default(true).description("在 CPU 初始化模型，降低启动显存峰值"),
