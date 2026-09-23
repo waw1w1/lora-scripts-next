@@ -323,3 +323,63 @@ def test_restored_edit_api_task_preserves_engine_arguments(configured, monkeypat
         assert payload['training_task'] == 'image-edit'
     finally:
         run.tm.tasks.pop(task.task_id)
+
+
+@pytest.mark.parametrize('dataset_format', ['image_text', 'json', 'jsonl', 'csv'])
+@pytest.mark.parametrize('cache', [False, True])
+@pytest.mark.parametrize('size', [(16, 16), (32, 32), (256, 256), (2048, 1024), (4096, 32), (32, 4096)])
+def test_reference_geometry_preflight(configured, dataset_format, cache, size):
+    """All submission formats reject zero-sized references before either cache path."""
+    from mikazuki.engines.diffsynth.inputs import InputError
+    rt, config = configured
+    config = edit_config(rt, config)
+    # Resolution overrides legacy max_pixels, exactly as for emitted runtime args.
+    config.update(cache_embeddings=cache, resolution='256,256', max_pixels=1048576)
+    reference = Path(config['control_data_dirs'][0]) / '3_character/sample.webp'
+    Image.new('RGB', size).save(reference)
+    second = rt.project_root / 'second.png'
+    Image.new('RGB', (64, 64)).save(second)
+    if dataset_format != 'image_text':
+        row = {'image': str(Path(config['train_data_dir']) / '3_character/sample.png'),
+               'prompt': 'edit', 'edit_image': [str(second), str(reference)]}
+        metadata = rt.project_root / ('data.' + dataset_format)
+        if dataset_format == 'csv':
+            with metadata.open('w', newline='') as stream:
+                writer = csv.DictWriter(stream, fieldnames=row)
+                writer.writeheader()
+                writer.writerow({**row, 'edit_image': json.dumps(row['edit_image'])})
+        else:
+            metadata.write_text(json.dumps([row] if dataset_format == 'json' else row))
+        config.update(dataset_format='metadata', dataset_base_path=str(rt.project_root),
+                      dataset_metadata_path=str(metadata))
+    if size in [(16, 16), (4096, 32), (32, 4096)]:
+        with pytest.raises(InputError) as caught:
+            adapt_config(config, rt)
+        message = str(caught.value)
+        assert '第 1 条' in message
+        assert str(reference) in message
+        assert f'{size[0]}×{size[1]}' in message
+        assert '65536' in message and '32 像素' in message
+    else:
+        adapted = adapt_config(config, rt)
+        assert adapted.arguments['max_pixels'] == 65536
+        assert adapted.engine['cache_embeddings'] is cache
+        assert adapted.dataset[0]['edit_image'] == ([str(reference)] if dataset_format == 'image_text'
+                                                  else [str(second), str(reference)])
+        assert adapted.engine['bucket_sizes'][0] == (256, 256)
+        assert len(adapted.dataset) == (3 if dataset_format == 'image_text' else 1)
+
+
+def test_reference_size_matches_pinned_upstream():
+    from mikazuki.engines.diffsynth.inputs import reference_size
+    operators = pytest.importorskip('diffsynth.core.data.operators')
+    for max_pixels in [65536, 1048576, 2097152]:
+        operator = operators.ImageCropAndResize(max_pixels=max_pixels,
+                                               height_division_factor=32, width_division_factor=32)
+        for size in [(16, 16), (31, 64), (32, 32), (256, 256), (1024, 2048),
+                     (4096, 32), (32, 4096), (63, 4096), (4096, 63)]:
+            image = Image.new('RGBA', size)
+            predicted = reference_size(*size, max_pixels)
+            assert predicted == operator.get_height_width(image)[::-1]
+            if min(predicted) > 0:
+                assert operator(image).size == predicted

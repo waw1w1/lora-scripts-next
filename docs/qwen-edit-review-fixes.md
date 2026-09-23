@@ -38,3 +38,25 @@ Hook 测试仅证明回调生命周期正确；不宣称已证明显存泄漏或
   `test_http_run_spawns_real_entry_parser_without_training`；实际上游 parser/dataset/model-function
   的进程内契约测试及 /api/run 任务配置测试已执行通过。
 - 环境使用 CPU Torch 2.8.0；未加载真实 Qwen 模型，不包含 CUDA 训练验收。
+
+## 二次复审：REV-06（基于 8281a3b）
+
+针对《复审问题清单_8281a3b.md》，在数据提交预检中补齐参考图尺寸保护：
+使用与运行参数相同的 `bucket_settings(config).max_pixels`（`resolution` 优先），
+按固定上游 `ImageCropAndResize` 的等比缩小、整数截断及向下对齐到 32 的规则预测尺寸。
+任意一边归零时拒绝提交，错误包含样本编号、参考路径、原始尺寸、最大像素面积、
+对齐后尺寸及每边至少 32 像素的条件。不会临时放大参考图。
+
+- 图片＋TXT、JSON、JSONL、CSV 共用保护；缓存开关均在创建训练任务前校验。
+- 原有参考图检查去重、目录索引、多图顺序及目标图分桶保持；预览使用独立的管线几何处理，
+  不套用仅属于训练数据加载器的限制。
+- 新增 48 组配置适配测试：四种入口 × 缓存开关 × 六组尺寸。
+  16×16 及在 65536 像素限制下缩小后短边归零的 4096×32 / 32×4096 被拒绝；
+  32×32、256×256、2048×1024 通过，同时断言参考图顺序、目标桶尺寸及重复次数。
+- 另用固定上游真实算子核对三个像素限制、九组尺寸的预测；合法尺寸实际执行 resize/crop。
+- 本轮后端回归：`pytest tests/test_diffsynth_engine.py tests/test_diffsynth_review.py tests/test_diffsynth_edit.py -q`
+  **90 passed、1 skipped**。跳过项仍为原有真实子进程 parser 烟测。
+  本轮没有前端代码变更，未重跑前端检查；上文 232 项是上一轮结果。
+
+这些结果覆盖 CPU 数据预检与算子，不代表已完成缓存/非缓存真实 GPU 训练、
+原生 Windows 或 ComfyUI 产物验收。TEST-02 仍待完成；分支仍未合并到 dev。
