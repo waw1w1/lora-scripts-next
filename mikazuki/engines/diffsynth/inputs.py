@@ -164,7 +164,7 @@ def reference_size(width, height, max_pixels):
     return width // 32 * 32, height // 32 * 32
 
 
-def reference_paths(value, base, field, checked=None, *, max_pixels=None):
+def reference_paths(value, base, field, checked=None, *, max_pixels=None, target_size=None):
     # CSV can hold a JSON array; JSON/JSONL also accept a single path.
     if isinstance(value, str):
         value = json.loads(value) if value.lstrip().startswith('[') else [value]
@@ -175,16 +175,19 @@ def reference_paths(value, base, field, checked=None, *, max_pixels=None):
     for item in value:
         path = absolute(item, base)
         if checked is not None and path in checked:
-            paths.append(str(path))
-            continue
-        if not path.is_file():
-            raise InputError(field, '参考图不存在', path)
-        try:
-            with Image.open(path) as image:
-                width, height = image.size
-                image.verify()
-        except (OSError, ValueError) as exc:
-            raise InputError(field, '无法读取参考图', path) from exc
+            width, height = checked[path]
+        else:
+            if not path.is_file():
+                raise InputError(field, '参考图不存在', path)
+            try:
+                with Image.open(path) as image:
+                    width, height = image.size
+                    image.verify()
+            except (OSError, ValueError) as exc:
+                raise InputError(field, '无法读取参考图', path) from exc
+            if checked is not None:
+                checked[path] = (width, height)
+        resized = (width, height)
         if max_pixels is not None:
             resized = reference_size(width, height, max_pixels)
             if min(resized) == 0:
@@ -192,19 +195,29 @@ def reference_paths(value, base, field, checked=None, *, max_pixels=None):
                                  f'{max_pixels} 等比缩小并向下对齐到 32 像素后为 '
                                  f'{resized[0]}×{resized[1]}；处理后每边须至少为 32 像素，'
                                  '请调整参考图尺寸或比例', path)
-        if checked is not None:
-            checked.add(path)
+        if target_size is not None:
+            # Match the pinned Edit embedder before its minimum-area correction.
+            # A reference reused by different target buckets must be checked again.
+            ratio = resized[0] / resized[1]
+            edit_width = math.sqrt(target_size[0] * target_size[1] * ratio)
+            edit_size = (round(edit_width / 32) * 32, round(edit_width / ratio / 32) * 32)
+            if min(edit_size) == 0:
+                raise InputError(field, f'参考图原始尺寸 {width}×{height}，加载后为 '
+                                 f'{resized[0]}×{resized[1]}，按目标尺寸 '
+                                 f'{target_size[0]}×{target_size[1]} 再次缩放后为 '
+                                 f'{edit_size[0]}×{edit_size[1]}；请增大目标尺寸或调整参考图比例', path)
         paths.append(str(path))
     return paths
 
 
 def dataset_inputs(config, root):
     editing = is_edit(config)
-    checked = set()
+    checked = {}
     max_pixels = None
     if editing:
-        from .buckets import bucket_settings
-        max_pixels = bucket_settings(config)['max_pixels']
+        from .buckets import bucket_settings, select_bucket
+        settings = bucket_settings(config)
+        max_pixels = settings['max_pixels']
         if max_pixels <= 0:
             raise InputError('max_pixels', '最大像素面积必须大于 0')
         from mikazuki.log import log
@@ -252,7 +265,7 @@ def dataset_inputs(config, root):
                     if len(matches) != 1:
                         raise InputError('control_data_dirs', f'参考图须按相对目录及同名文件配对，找到 {len(matches)} 个候选', directory / relative)
                     references.append(str(matches[0]))
-                row['edit_image'] = reference_paths(references, base, f'control_data_dirs 第 {len(rows) + 1} 条', checked, max_pixels=max_pixels)
+                row['edit_image'] = references
             rows.extend([row] * repeat)
         metadata = None
     elif mode == 'metadata':
@@ -281,8 +294,15 @@ def dataset_inputs(config, root):
     if not rows:
         raise InputError('train_data_dir' if mode == 'image_text' else 'dataset_metadata_path', '数据集没有图片')
     if editing:
+        from PIL import Image
+        target_sizes = {}
         for i, row in enumerate(rows):
-            row['edit_image'] = reference_paths(row.get('edit_image'), base, f'edit_image 第 {i + 1} 条', checked, max_pixels=max_pixels)
+            target = absolute(row['image'], base)
+            if target not in target_sizes:
+                with Image.open(target) as image:
+                    target_sizes[target] = select_bucket(*image.size, settings)[0]
+            row['edit_image'] = reference_paths(row.get('edit_image'), base, f'edit_image 第 {i + 1} 条', checked,
+                                                max_pixels=max_pixels, target_size=target_sizes[target])
         # Normalize single paths / CSV arrays to the same upstream JSON contract.
         # Never overwrite the user's metadata.
         metadata = None

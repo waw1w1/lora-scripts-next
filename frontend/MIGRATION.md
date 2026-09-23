@@ -220,14 +220,3 @@ for the proposal-to-current-API mapping and outstanding real-training acceptance
 Validation: Node 22 `npm run check` passed (221 tests, typecheck, lint, production build);
 related backend regression: 27 passed, 3 skipped (optional torch/DiffSynth dependencies).
 No browser interaction or GPU training was performed for this merge.
-
-
-### Qwen Edit review fixes (2026-09-23)
-
-- Enum schema fields preserve `role`/`extra`; hidden `external-control` fields keep
-  user selections across autosave/import/re-edit. Disabled/const locks remain.
-- Qwen Edit batch and numbered preview-reference errors share the existing field
-  validation and live config diagnostics. Invalid explicit modes block submission;
-  missing legacy mode defaults to T2I.
-- Actual TrainingPage lifecycle tests cover restore, TOML export/import, pending
-  task import and final training requests. GPU/Windows acceptance remains pending.

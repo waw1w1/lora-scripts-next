@@ -43,7 +43,7 @@ def test_mixed_directory_repeats_and_empty_caption(configured):
     assert sum(row['prompt'] == '' for row in adapted.dataset) == 2
 
 
-def test_comfy_component_mode_uses_managed_processor_without_downloading(configured):
+def test_comfy_component_mode_and_processor_errors(configured):
     rt, config = configured
     model = Path(config['diffsynth_model_dir'])
     config.update(model_input_mode='components', dit_path=str(model / 'transformer'), text_encoder_path=str(model / 'text_encoder'), vae_path=str(model / 'vae'))
@@ -54,11 +54,8 @@ def test_comfy_component_mode_uses_managed_processor_without_downloading(configu
     assert plan['transformer_blocks.0.img_mlp.proj.weight'][1] == 'second_half'
     assert any(op == 'squeeze_time' for _, op in adapted.engine['models'][2]['conversion'].values())
     (model / 'processor/tokenizer.json').unlink()
-    from mikazuki.engines.diffsynth.processor import processor_directory
-    config['processor_path'] = str(model / 'processor')  # Legacy overrides are ignored.
-    checked = adapt_config(config, rt)
-    assert checked.arguments['processor_path'] == str(processor_directory(rt.project_root))
-    assert not processor_directory(rt.project_root).exists()  # Preflight must not download.
+    with pytest.raises(ValueError, match='Processor'):
+        adapt_config(config, rt)
 
 
 def test_bad_index_and_ambiguous_models_fail(tmp_path):

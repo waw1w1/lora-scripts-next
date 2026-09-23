@@ -31,9 +31,8 @@ def sample_config(config, root=None):
         from .inputs import is_edit, reference_paths
         from pathlib import Path
         controls = sample.pop('controlImages', [])
-        if is_edit(config):
-            sample['controlImages'] = reference_paths(controls, Path(root or '.'), f'预览样例 {i + 1}')
-        elif controls != []:
+        editing = is_edit(config)
+        if not editing and controls != []:
             raise ValueError(f'预览样例 {i + 1}: 文生图不支持参考图，controlImages 必须为空数组')
         sample = {**DEFAULT_SAMPLE, **sample}
         if not isinstance(sample['prompt'], str):
@@ -50,5 +49,8 @@ def sample_config(config, root=None):
         if not math.isfinite(cfg) or cfg < 1:
             raise ValueError('预览 guidance_scale 必须 >= 1')
         sample['guidance_scale'] = cfg
+        if editing:
+            sample['controlImages'] = reference_paths(controls, Path(root or '.'), f'预览样例 {i + 1}',
+                                                      target_size=(sample['width'], sample['height']))
         result.append(sample)
     return {'enabled': True, 'every_steps': interval, 'every_epochs': every_epochs, 'samples': result}

@@ -187,7 +187,9 @@ BucketManager/make_bucket_resolutions 规则选桶：最接近宽高比、等比
   缓存键包含参考图顺序、路径、大小、修改时间及尺寸处理参数；预览正负提示词也分别结合参考图编码。
 
 底层传入官方 `data_file_keys=image,edit_image`、`extra_inputs=edit_image`，
-继续使用固定上游训练模块和损失函数。新增测试验证配对、配置往返、缓存隔离与失效、
-上游输入契约和前端切换；**本环境没有真实 GPU 权重训练验收**，仍需在本地显卡上验证训练及 ComfyUI 出图。
+继续使用固定上游训练模块和损失函数。提交前检查参考图经过数据加载器及按目标桶面积
+再次缩放后的尺寸；任一边归零时拒绝提交，并提示对应图片和目标尺寸。
+预览参考图按各样例的预览尺寸单独检查。
 
-审阅修复及剩余验收范围见 [Qwen Edit 审阅修复记录](qwen-edit-review-fixes.md)。
+切换源码分支后，若 GUI 缺少 Edit 按钮，先在 `frontend/` 使用 Node 22 执行
+`npm run build` 并刷新页面；后端托管的 `frontend/dist/` 可能仍是旧分支构建。
