@@ -29,6 +29,7 @@ from mikazuki.datasets.upload import (
     MAX_BATCH_BYTES,
     cleanup_staging,
     ensure_capacity,
+    ensure_staging_headroom,
     move_staged,
     new_staging_dir,
     relative_of,
@@ -284,6 +285,7 @@ async def upload(name: str, request: Request):
                 continue
             try:
                 staged, written = await stage_upload(item, staging, rel)
+                ensure_staging_headroom(staging)
             except ValueError as exc:
                 failed.append({"path": rel, "reason": str(exc)})
                 continue

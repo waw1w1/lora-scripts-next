@@ -1,4 +1,5 @@
 import io
+import shutil
 from pathlib import Path
 
 import pytest
@@ -201,3 +202,44 @@ def test_upload_rejects_bad_conflict_mode(dataset):
     client = TestClient(app)
     response = post_files(client, "ds", [("a.png", png_bytes())], conflict="rename")
     assert response.status_code == 400
+
+
+def test_upload_enospc_during_staging_returns_507(dataset, monkeypatch):
+    import errno as errno_module
+
+    real_open = Path.open
+
+    def fake_open(self, mode="r", *args, **kwargs):
+        if ".upload-tmp" in str(self) and "w" in mode:
+            raise OSError(errno_module.ENOSPC, "No space left on device")
+        return real_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fake_open)
+    (dataset / "keep.png").write_bytes(b"keep")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = post_files(client, "ds", [("a.png", png_bytes())])
+
+    assert response.status_code == 507
+    assert (dataset / "keep.png").read_bytes() == b"keep"
+    assert not (dataset / "a.png").exists()
+    staging_root = dataset.parent / ".upload-tmp"
+    assert not staging_root.exists() or not list(staging_root.iterdir())
+
+
+def test_upload_low_disk_headroom_returns_507(dataset, monkeypatch):
+    monkeypatch.setattr(
+        upload_module.shutil,
+        "disk_usage",
+        lambda _path: shutil._ntuple_diskusage(10**12, 10**12 - 1, 1),
+    )
+    (dataset / "keep.png").write_bytes(b"keep")
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = post_files(client, "ds", [("a.png", png_bytes())])
+
+    assert response.status_code == 507
+    assert (dataset / "keep.png").read_bytes() == b"keep"
+    assert not (dataset / "a.png").exists()
+    staging_root = dataset.parent / ".upload-tmp"
+    assert not staging_root.exists() or not list(staging_root.iterdir())

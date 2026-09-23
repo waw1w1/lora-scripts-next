@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import os
 import shutil
 import uuid
@@ -12,6 +13,7 @@ from mikazuki.dataset_editor import IMAGE_EXTENSIONS
 
 MAX_FILE_BYTES = 100 * 1024 * 1024
 MAX_BATCH_BYTES = 5 * 1024 * 1024 * 1024
+MIN_FREE_BYTES = 512 * 1024 * 1024
 CAPTION_EXTENSION = ".txt"
 ALLOWED_EXTENSIONS = IMAGE_EXTENSIONS | {CAPTION_EXTENSION}
 _CHUNK = 1024 * 1024
@@ -57,10 +59,20 @@ async def stage_upload(upload: UploadFile, staging_dir: Path, rel: str) -> tuple
                 if written > MAX_FILE_BYTES:
                     raise ValueError(f"file exceeds {MAX_FILE_BYTES // (1024 * 1024)}MB limit")
                 out.write(chunk)
+    except OSError as exc:
+        staged.unlink(missing_ok=True)
+        if exc.errno == errno.ENOSPC:
+            raise HTTPException(status_code=507, detail="insufficient disk space while receiving upload") from exc
+        raise
     except Exception:
         staged.unlink(missing_ok=True)
         raise
     return staged, written
+
+
+def ensure_staging_headroom(staging_dir: Path) -> None:
+    if shutil.disk_usage(staging_dir).free < MIN_FREE_BYTES:
+        raise HTTPException(status_code=507, detail="insufficient disk space while receiving upload")
 
 
 def validate_readable(staged: Path) -> None:
