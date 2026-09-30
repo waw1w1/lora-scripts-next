@@ -41,14 +41,16 @@ export const PRODUCT_DEFAULT_ENGINE: TrainingEngine = "kohya"
 export const ENGINE_CATALOG: readonly EngineDefinition[] = [
   {
     id: "kohya",
-    kind: "builtin",
+    kind: "optional",
     nameKey: "settings.engines.catalog.kohya.name",
     summaryKey: "settings.engines.catalog.kohya.summary",
-    managesRuntime: false,
+    sizeHintKey: "settings.engines.catalog.kohya.sizeHint",
+    requiresGpu: true,
+    managesRuntime: true,
     mark: "K",
     tags: ["lora", "sd15", "sdxl", "flux", "anima"],
-    version: "builtin",
-    updatedAt: "—",
+    version: "plugin",
+    updatedAt: "2026-09",
   },
   {
     id: "anima-fast",
@@ -89,6 +91,12 @@ export const ENGINE_CATALOG: readonly EngineDefinition[] = [
     tags: ["lora", "klein", "nvidia"],
     version: "plugin",
     updatedAt: "2026-08",
+  },
+  {
+    id: "diffsynth", kind: "optional", nameKey: "settings.engines.catalog.diffsynth.name",
+    summaryKey: "settings.engines.catalog.diffsynth.summary", sizeHintKey: "settings.engines.catalog.diffsynth.sizeHint",
+    requiresGpu: true, managesRuntime: true, mark: "DS", tags: ["lora", "qwen-image-21", "nvidia"],
+    version: "plugin", updatedAt: "2026-09",
   },
 ] as const
 

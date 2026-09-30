@@ -89,6 +89,12 @@ class PortableGitBehavior(unittest.TestCase):
         for path, data in DATA.items():
             self.write(self.package, path, data)
 
+    def test_seed_excludes_local_network_credentials(self):
+        self.write(self.source, "config/network.local.json", b'{"proxy": "private"}')
+        self.package = self.root / "network-clean-package"
+        self.helper("seed", source=True)
+        self.assertFalse((self.package / "config/network.local.json").exists())
+
     def legacy_bootstrap(self):
         path = "scripts/portable/portable_git.py"
         self.git(self.source, "rm", path)

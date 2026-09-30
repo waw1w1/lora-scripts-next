@@ -40,6 +40,14 @@ TRAINER_MAPPING = {
 
 
 def handle_run(config: dict, ctx: RunContext):
+    from .settings import runtime
+    from .extension_state import read_status
+
+    rt = runtime()
+    status = read_status(rt)
+    if status["state"] != "ready":
+        return APIResponseFail(message="kohya (sd-scripts) 训练环境未就绪，请到训练引擎管理中安装或修复。")
+
     model_train_type = ctx.model_train_type
     toml_file = os.path.join(ctx.autosave_dir, f"{ctx.timestamp}.toml")
 
@@ -58,9 +66,22 @@ def handle_run(config: dict, ctx: RunContext):
     apply_sdxl_prediction_type(config, model_train_type)
     apply_anima_training_defaults(config, model_train_type)
 
+    dataset_config = str(config.get("dataset_config") or "").strip()
+    if dataset_config:
+        config["dataset_config"] = dataset_config
+
     if model_train_type != "sdxl-finetune":
-        if not train_utils.validate_data_dir(train_data_dir):
+        # A dataset_config owns the dataset layout, so validate_data_dir must not
+        # reorganize train_data_dir underneath it: moving loose images into a
+        # generated N_xxx subdir leaves every image_dir in the toml pointing at an
+        # emptied directory, and sd-scripts only warns before skipping the subset.
+        if not train_utils.validate_data_dir(train_data_dir, auto_organize=not dataset_config):
             return APIResponseFail(message="训练数据集路径不存在或没有图片，请检查目录。")
+
+    if dataset_config:
+        dataset_ok, dataset_message = train_utils.validate_dataset_config(dataset_config)
+        if not dataset_ok:
+            return APIResponseFail(message=dataset_message)
 
     validated, message = train_utils.validate_model(pretrained_model, model_train_type)
     if not validated:
@@ -105,6 +126,7 @@ def handle_run(config: dict, ctx: RunContext):
         f.write(toml.dumps(config))
 
     result = process.run_train(toml_file, trainer_file, ctx.gpu_ids, suggest_cpu_threads,
-                               metadata={"train_type": model_train_type})
+                               metadata={"train_type": model_train_type},
+                               python_executable=str(rt.python))
 
     return result

@@ -14,6 +14,17 @@ import {
 } from "./modules"
 
 describe("training module mapping", () => {
+  it("accepts the legacy Qwen-Image 2.1 URL spelling", () => {
+    expect(normalizeModel("qwen-image-2.1")).toBe("qwen-image-21")
+  })
+
+  it("exposes only Qwen-Image-2.1 LoRA for DiffSynth", () => {
+    expect(resolveModule("qwen-image-21", "diffsynth", "lora")?.schemaName).toBe("qwen-image-21-lora")
+    expect(resolveModule("qwen-image-21", "diffsynth", "finetune")).toBeUndefined()
+    for (const model of TRAINING_MODELS) {
+      if (model !== "qwen-image-21") expect(isEngineSupported(model, "diffsynth")).toBe(false)
+    }
+  })
   it("resolves every v1 minimal mapping", () => {
     expect(resolveModule("anima", "kohya", "lora")?.schemaName).toBe("sd3-lora")
     expect(resolveModule("anima", "anima-fast", "lora")?.schemaName).toBe("anima-lora-fast")

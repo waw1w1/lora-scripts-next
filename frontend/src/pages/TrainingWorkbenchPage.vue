@@ -4,6 +4,8 @@ import { useRoute, useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
 import { useI18n } from "vue-i18n"
 import AnimaFastPage from "./AnimaFastPage.vue"
+import DiffSynthGatePage from "./DiffSynthGatePage.vue"
+import KohyaGatePage from "./KohyaGatePage.vue"
 import MusubiGatePage from "./MusubiGatePage.vue"
 import AiToolkitGatePage from "./AiToolkitGatePage.vue"
 import TrainingPage from "./TrainingPage.vue"
@@ -100,6 +102,12 @@ watch([model, engine, target], () => {
         <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />
       </template>
     </AnimaFastPage>
+    <DiffSynthGatePage v-else-if="resolved.engine === 'diffsynth'" bare>
+      <template #form-top>
+        <WorkbenchHeader />
+        <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />
+      </template>
+    </DiffSynthGatePage>
     <MusubiGatePage v-else-if="resolved.engine === 'musubi'" bare>
       <template #form-top>
         <WorkbenchHeader />
@@ -112,6 +120,12 @@ watch([model, engine, target], () => {
         <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />
       </template>
     </AiToolkitGatePage>
+    <KohyaGatePage v-else-if="resolved.engine === 'kohya' && schemaMeta" :key="resolved.storageKey || resolved.schemaName" bare :title="schemaMeta.title" :area="schemaMeta.area" :schema-name="resolved.schemaName" :field-defaults="resolved.defaults" :storage-key="resolved.storageKey" :legacy-storage-key="resolved.legacyStorageKey">
+      <template #form-top>
+        <WorkbenchHeader />
+        <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />
+      </template>
+    </KohyaGatePage>
     <TrainingPage v-else-if="schemaMeta" :key="resolved.storageKey || resolved.schemaName" bare :title="schemaMeta.title" :area="schemaMeta.area" :schema-name="resolved.schemaName" :field-defaults="resolved.defaults" :storage-key="resolved.storageKey" :legacy-storage-key="resolved.legacyStorageKey">
       <template #form-top>
         <WorkbenchHeader />

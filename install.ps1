@@ -29,11 +29,13 @@ if (!(Test-Path -Path "venv")) {
 
 Write-Output "Installing deps..."
 
-pip install torch==2.7.0+cu128 torchvision==0.22.0+cu128 --index-url https://download.pytorch.org/whl/cu128
-if ($LASTEXITCODE -ne 0) { Write-Output "torch install failed. Delete venv and retry."; InstallFail }
-pip install -U -I --no-deps xformers==0.0.30 --index-url https://download.pytorch.org/whl/cu128
-if ($LASTEXITCODE -ne 0) { Write-Output "xformers install failed."; InstallFail }
-pip install --upgrade -r requirements.txt
+# Always `python -m pip`, never bare `pip`. If `pip` is not resolvable (a venv
+# created by uv has no pip shim, or PATH is odd) PowerShell raises a command-not-
+# found error without touching $LASTEXITCODE, so the checks below would still see
+# the 0 left by `python -m venv` and report "Install completed" over an empty venv.
+python -m pip install --upgrade "pip>=23.1"
+if ($LASTEXITCODE -ne 0) { Write-Output "pip upgrade failed. Check your network and retry."; InstallFail }
+python -m pip install --upgrade -r requirements.txt
 if ($LASTEXITCODE -ne 0) { Write-Output "requirements install failed."; InstallFail }
 
 Write-Output "Prefetching default WD tagger wd14-convnextv2-v2 (~388 MB)..."
@@ -44,5 +46,6 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Output "Install completed"
 Write-Output ""
-Write-Output "Optional: run install_flash_attn.bat to enable Flash Attention 2 acceleration."
+Write-Output "Note: training dependencies (torch, sd-scripts stack) are no longer part of"
+Write-Output "this environment. Install training engines from the UI: Settings -> Training Engines."
 Read-Host | Out-Null

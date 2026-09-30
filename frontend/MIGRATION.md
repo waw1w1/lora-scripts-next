@@ -187,6 +187,14 @@
 
 ## 变更记录规范
 
+### 2026-09-20 Issue #368：下载网络设置
+
+- 训练引擎与插件市场复用 `NetworkSettingsPanel`，读取/保存受宿主运行令牌保护的 `/api/network/settings`。
+- 网络配置持久化在服务端 `config/network.local.json`，不新增浏览器代理凭据存储；原下载镜像 localStorage 契约不变。
+- 自动、系统、手动和直连分别可选；安装进度附带线路、尝试次数与速率。新任务采用新配置，既有任务保持策略快照。
+- 前端类型、Lint、210 项测试和构建通过；Edge 桌面/390px 移动端预览验证了读取/保存与布局。后端 API 验证记录见 `docs/issues/368-network-policy-verification.md`。
+- 当前未构建新整合包，也未运行外部 Agent ZIP 工件测试；不将前端通过等同于发布验收完成。
+
 后续每个迁移 PR/提交在本文件追加：
 
 1. 迁移的页面或工作流。
@@ -194,3 +202,29 @@
 3. 与旧版的已知行为差异。
 4. 自动化及手工验证结果。
 5. 尚未解决的问题和优先级。
+
+
+### DiffSynth review integration
+
+Qwen-Image-2.1 now uses conditional directory/component inputs and image-TXT/native-metadata
+inputs through the shared schema adapter. Existing directory-only drafts remain compatible
+with the directory default. PreviewSampleField was adapted from the author's Klein branch
+for t2i samples; task previews, server path picking and config history reuse existing APIs.
+DiffSynth bypasses Kohya-specific parameter conversion; inactive schema fields are omitted.
+No training-page model download/probe widget is shown. CPU model offload + sampling is
+explicitly unavailable for the pinned upstream runner; see docs/diffsynth.md.
+
+
+### DiffSynth shared frontend contract merge (fork PR #1)
+
+Replaced the t2i-only PreviewSampleField copy with the author's shared component,
+Sample codec, translations and optional reference-path component. The existing SchemaField
+role mounts it with Qwen numeric limits; editing remains disabled. Removed the superseded
+global preview CSS in favor of the shared component styles. Existing sample_enabled
+configs and samples without controlImages remain compatible; the backend accepts an empty
+reference list and rejects actual edit inputs. See docs/team/diffsynth-frontend-contract.md
+for the proposal-to-current-API mapping and outstanding real-training acceptance.
+
+Validation: Node 22 `npm run check` passed (221 tests, typecheck, lint, production build);
+related backend regression: 27 passed, 3 skipped (optional torch/DiffSynth dependencies).
+No browser interaction or GPU training was performed for this merge.

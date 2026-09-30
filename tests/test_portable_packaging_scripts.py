@@ -221,3 +221,6 @@ def test_git_updater_templates_delegate_to_safe_helper():
     assert "git stash" not in text
     assert "git reset" not in text
     assert not any(line.strip().startswith("git pull ") for line in text.splitlines())
+    assert 'if defined NEXT_TRAINER_NETWORK_READY goto :network_policy_ready' in text
+    assert 'scripts\\network_run.py" --batch "%~f0" %*' in text
+    assert text.index(":network_policy_ready") < text.index("call :ensure_updater_bootstrap")
