@@ -40,7 +40,7 @@ import json, sys, torch, accelerate, safetensors
 from pathlib import Path
 root = Path(sys.argv[1]).resolve()
 paths = [sys.executable, sys.prefix, sys.base_prefix, torch.__file__,
-         accelerate.__file__, safetensors.__file__]
+         accelerate.__file__, safetensors.__file__, *sys.path]
 for path in paths:
     if not Path(path).resolve().is_relative_to(root):
         raise RuntimeError("Runtime escapes package: " + path)

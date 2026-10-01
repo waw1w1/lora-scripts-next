@@ -84,6 +84,8 @@ if exist "scripts\portable\link_portable_data_dirs.py" (
     "%PYTHON_EXE%" -s scripts\portable\link_portable_data_dirs.py >> "%LOG_FILE%" 2>&1
 )
 
+if exist "%PORTABLE_ROOT%portable-profile.json" goto :start_gui
+
 if exist "scripts\prefetch_default_tagger.py" (
     echo [tagger] Ensuring default WD tagger cache >> "%LOG_FILE%"
     "%PYTHON_EXE%" -s scripts\prefetch_default_tagger.py --if-missing --tagger-models-dir "%MIKAZUKI_TAGGER_MODELS_DIR%" >> "%LOG_FILE%" 2>&1
@@ -94,6 +96,7 @@ if exist "scripts\prefetch_sdxl_tokenizer.py" (
     "%PYTHON_EXE%" -s scripts\prefetch_sdxl_tokenizer.py --if-missing --cache-dir "%MIKAZUKI_TOKENIZER_CACHE_DIR%" >> "%LOG_FILE%" 2>&1
 )
 
+:start_gui
 echo [launch] Starting gui.py >> "%LOG_FILE%"
 echo.
 echo  Starting Next-Trainer...
