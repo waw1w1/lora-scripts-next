@@ -100,3 +100,28 @@ def test_main_audit_does_not_import_training_torch(monkeypatch):
 def test_fast_builder_skips_unrelated_tokenizer_downloads():
     text = (ROOT / "build-scripts/build_portable.ps1").read_text(encoding="utf-8-sig")
     assert "if (-not $BundleAnimaFast) {\n# SD-family tokenizer prefetch" in text
+
+
+def test_gui_without_transformers_does_not_partially_patch_modelscope(monkeypatch):
+    import builtins
+    import sys
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    import mikazuki.china_hub as hub
+
+    original = builtins.__import__
+
+    def importing(name, *args, **kwargs):
+        if name == "transformers" or name.startswith("transformers."):
+            raise ImportError("GUI-only environment")
+        return original(name, *args, **kwargs)
+
+    patch = Mock(side_effect=ImportError("transformers missing inside patch_hub"))
+    aliases = Mock()
+    monkeypatch.setitem(sys.modules, "modelscope.utils.hf_util", SimpleNamespace(patch_hub=patch))
+    monkeypatch.setattr(builtins, "__import__", importing)
+    monkeypatch.setattr(hub, "_PATCHED", False)
+    monkeypatch.setattr(hub, "_patch_modelscope_download_aliases", aliases)
+    assert hub.enable_china_hub(force=True) is False
+    patch.assert_not_called()
+    aliases.assert_not_called()
