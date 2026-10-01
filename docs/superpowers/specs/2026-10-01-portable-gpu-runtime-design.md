@@ -47,8 +47,9 @@ bundled and validated without a network dependency.
   or install final dependencies after temporary cleanup.
 - Disable user-site inheritance consistently in launchers, validation and
   dependency subprocesses. Never silently use system Python as a fallback.
-- For the current full Fast product, preserve existing host/Kohya inclusion;
-  this PR does not introduce the separate no-engine host architecture.
+- The complete Fast product includes GUI requirements and the isolated Fast
+  runtime. Kohya and host torch are NOT required or installed by this profile.
+  Preserve the existing lite/AIO flows separately.
 - Bundle only the required base Python, not the entire developer runtime tree.
 - Relocation repair must run before Fast audit/training, not just GUI startup.
 - Validate sys.executable, sys.prefix, sys.base_prefix, imported dependency

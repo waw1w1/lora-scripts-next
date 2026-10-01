@@ -16,13 +16,14 @@ set "MIKAZUKI_TOKENIZER_CACHE_DIR=%PORTABLE_ROOT%tokenizer-cache"
 :: Bundled tagger-models/tokenizer-cache first; do not force ModelScope (WD taggers are HF-only).
 if not defined MIKAZUKI_HUB_BACKEND set "MIKAZUKI_HUB_BACKEND=auto"
 set "PYTHONUTF8=1"
+set "PYTHONNOUSERSITE=1"
 :: Release-channel marketplace wiring (written by build_portable -MarketplaceCatalogOnly)
 if exist "%PORTABLE_ROOT%marketplace-env.bat" call "%PORTABLE_ROOT%marketplace-env.bat"
 set "PYTHON_EXE=%PORTABLE_ROOT%python_embeded\python.exe"
 if defined NEXT_TRAINER_NETWORK_READY goto :network_policy_ready
 if not exist "%PORTABLE_ROOT%Next-Trainer\scripts\network_run.py" goto :network_policy_ready
 if not exist "%PYTHON_EXE%" goto :network_policy_ready
-"%PYTHON_EXE%" "%PORTABLE_ROOT%Next-Trainer\scripts\network_run.py" --batch "%~f0" %*
+"%PYTHON_EXE%" -s "%PORTABLE_ROOT%Next-Trainer\scripts\network_run.py" --batch "%~f0" %*
 exit /b %errorlevel%
 :network_policy_ready
 
@@ -37,11 +38,18 @@ echo ============================================ >> "%LOG_FILE%"
 echo. >> "%LOG_FILE%"
 
 if not exist "%PYTHON_EXE%" goto :no_python
+if exist "%PORTABLE_ROOT%portable-profile.json" goto :fast_profile
 
 if not exist "%PORTABLE_ROOT%python_embeded\Lib\site-packages\torch" goto :first_run
 echo [setup] Verifying embedded dependencies >> "%LOG_FILE%"
 "%PYTHON_EXE%" -s -c "import torch, torchvision, accelerate, diffusers, gradio" >nul 2>> "%LOG_FILE%"
 if errorlevel 1 goto :repair_run
+goto :launch
+
+:fast_profile
+echo [setup] Verifying standalone GUI and Fast package >> "%LOG_FILE%"
+"%PYTHON_EXE%" -s "%PORTABLE_ROOT%Next-Trainer\scripts\portable\verify_fast_package.py" --portable-root "%PORTABLE_ROOT%." >> "%LOG_FILE%" 2>&1
+if errorlevel 1 goto :fail
 goto :launch
 
 :first_run

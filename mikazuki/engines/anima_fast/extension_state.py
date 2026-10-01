@@ -27,6 +27,8 @@ class ExtensionLayout:
     @property
     def venv_python(self) -> Path:
         if sys.platform == "win32":
+            from .portable_runtime import repair
+            repair(self.root)
             return self.root / ".venv" / "Scripts" / "python.exe"
         return self.root / ".venv" / "bin" / "python"
 

@@ -773,7 +773,7 @@ def _main_facts_in_process() -> dict:
         except importlib.metadata.PackageNotFoundError:
             packages[name] = None
     imports = {}
-    for name in ("cv2", "torch"):
+    for name in ("cv2",):
         try:
             __import__(name)
             imports[name] = True
@@ -787,13 +787,6 @@ def _main_facts_in_process() -> dict:
         "packages": packages,
         "imports": imports,
     }
-    try:
-        import torch
-
-        facts["torch_cuda_available"] = bool(torch.cuda.is_available())
-        facts["torch_cuda"] = getattr(torch.version, "cuda", "")
-    except Exception as exc:
-        facts["torch_error"] = repr(exc)
     return facts
 
 
@@ -816,7 +809,7 @@ def audit_environment(
     main_facts = _main_facts_in_process() if main_python.resolve() == Path(sys.executable).resolve() else _collect_python_facts(
         main_python,
         sorted(set(MAIN_EXPECTED["exact"]) | {name for names in MAIN_EXPECTED.get("alternatives", {}).values() for name in names}),
-        ["cv2", "torch"],
+        ["cv2"],
         root,
     )
     anima_expected = _anima_expected_for_platform()
