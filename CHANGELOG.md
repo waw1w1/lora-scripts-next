@@ -2,6 +2,8 @@
 
 本文件记录 **wochenlong/lora-scripts-next**（产品名 **Next Trainer**）面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
+> 当前开发版的功能进展与限制见 [开发进展](docs/dev-progress.md)，未来目标见 [路线图](docs/roadmap.md)。下方历史版本中的分支、下载和发布时间说明属于当时记录，不代表当前状态。
+
 ---
 ## 未发布（dev）
 
