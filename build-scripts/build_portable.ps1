@@ -620,6 +620,8 @@ if ($SkipTaggerPrefetch) {
 }
 
 Write-Host ""
+if (-not $BundleAnimaFast) {
+# SD-family tokenizer prefetch is not a prerequisite for the Fast-only profile.
 Write-Host "[3b/6] Bundling SD/SDXL/Flux tokenizer cache (~8 MB, offline training)..." -ForegroundColor Cyan
 
 $tokenizerCacheDir = Join-Path $portableDir "tokenizer-cache"
@@ -672,6 +674,8 @@ foreach ($bundle in $tokenizerBundles) {
             throw "Tokenizer cache incomplete after prefetch: $path"
         }
     }
+}
+
 }
 
 # Complete Fast host: install final GUI dependencies AFTER prefetch cleanup.

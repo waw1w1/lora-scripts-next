@@ -95,3 +95,8 @@ def test_main_audit_does_not_import_training_torch(monkeypatch):
     facts = _main_facts_in_process()
     assert calls == []
     assert "torch" not in facts["imports"]
+
+
+def test_fast_builder_skips_unrelated_tokenizer_downloads():
+    text = (ROOT / "build-scripts/build_portable.ps1").read_text(encoding="utf-8-sig")
+    assert "if (-not $BundleAnimaFast) {\n# SD-family tokenizer prefetch" in text
