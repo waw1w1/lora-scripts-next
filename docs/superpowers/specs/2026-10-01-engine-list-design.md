@@ -20,7 +20,10 @@ The psutil dependency fix is a separate change.
   status independently, including for Kohya.
 - Reuse Element Plus icons and existing feature CSS/tokens. Narrow screens
   wrap tags and toolbar controls without horizontal overflow.
-- Do not add pagination or virtualization in this iteration.
+- Paginate at a fixed five engines per page; hide pagination when results fit
+  on one page. Search/filter the complete catalog before slicing the page.
+  Changing search/filter resets to page one; status changes clamp the page.
+  No virtualization in this iteration.
 
 ## Search And Filters
 
@@ -44,6 +47,8 @@ states prove whether runtime files exist.
 - The menu offers Move to top, Move up, and Move down as keyboard/touch
   alternatives. Up/down use adjacent visible items as destinations.
 - Provide Restore default order as a list-level menu action.
+- Dragging and adjacent moves stay within the current page. Move to top moves
+  to the global first position and returns to page one, as does restoring order.
 - Persist only engine IDs under a dedicated browser-local storage key,
   separate from nt.training.enginePrefs.
 - Normalize saved data: remove duplicates and obsolete IDs, append new catalog
