@@ -7,6 +7,8 @@ huggingface-hub==0.36.2
 rich==13.7.0
 pandas
 requests
+# GUI task process management (mikazuki/tasks.py), also without training engines
+psutil
 pillow
 numpy==1.26.4
 # tagger image utils
