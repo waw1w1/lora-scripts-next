@@ -32,6 +32,7 @@ modelscope>=1.20.0
 # launch_utils still uses pkg_resources
 setuptools<81
 nvidia-ml-py
+psutil
 # marketplace trust-v2: Ed25519 verification for the plugin catalog and the managed-assets
 # index (mikazuki/plugin_marketplace/trust.py). Security-critical verify path: declared
 # explicitly, never relied on as a transitive dependency.
