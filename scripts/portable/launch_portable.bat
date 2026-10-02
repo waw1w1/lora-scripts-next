@@ -47,8 +47,8 @@ if errorlevel 1 goto :repair_run
 goto :launch
 
 :fast_profile
-echo [setup] Verifying standalone GUI and Fast package >> "%LOG_FILE%"
-"%PYTHON_EXE%" -s "%PORTABLE_ROOT%Next-Trainer\scripts\portable\verify_fast_package.py" --portable-root "%PORTABLE_ROOT%." >> "%LOG_FILE%" 2>&1
+echo [setup] Verifying standalone GUI dependencies >> "%LOG_FILE%"
+"%PYTHON_EXE%" -s "%PORTABLE_ROOT%Next-Trainer\scripts\portable\verify_fast_package.py" --portable-root "%PORTABLE_ROOT%." --gui-only >> "%LOG_FILE%" 2>&1
 if errorlevel 1 goto :fail
 goto :launch
 

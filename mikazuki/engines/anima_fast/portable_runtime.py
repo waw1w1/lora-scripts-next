@@ -4,6 +4,29 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import shutil
+
+
+def rebuild_base(root: Path, base_python: Path) -> Path:
+    """Explicit installer recovery; preserve venv packages and user data."""
+    root = Path(root).resolve()
+    target = root / ".python"
+    for path in (target, root / ".venv", root / "portable-runtime.json"):
+        if not path.resolve().is_relative_to(root):
+            raise RuntimeError("Portable Fast runtime points outside its package")
+    # Never follow existing junctions/symlinks while repairing a copied tree.
+    for directory in (target, root / ".venv"):
+        if directory.resolve() != directory.absolute():
+            raise RuntimeError("Portable runtime contains a linked path")
+        for path in directory.rglob("*"):
+            if path.resolve() != path.absolute():
+                raise RuntimeError("Portable runtime contains a linked path")
+    shutil.copytree(
+        Path(base_python).resolve().parent, target, dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("site-packages", "__pycache__", "*.pyc", ".git"),
+    )
+    (root / "portable-runtime.json").write_text('{"version": 1}', encoding="utf-8")
+    return target / "python.exe"
 
 
 def repair(root: Path) -> None:

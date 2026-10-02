@@ -36,3 +36,23 @@ This is not long-run training-quality validation. External model weights were
 read-only; the host does not include torch or transformers. Marketplace,
 optional tagger downloads and public-network update fallbacks were not covered.
 No artifacts were uploaded and neither PR was merged.
+
+## Recovery Follow-up (2026-10-02)
+
+- Daily portable startup checks only GUI dependencies. Missing/broken/uninstalled
+  Fast no longer blocks opening the GUI; full package validation remains the
+  default and the builder still requests a strict engine audit.
+- Python path access is side-effect free. Status and audit explicitly repair
+  relocated metadata and return structured failure on damaged portable files.
+- Explicit engine repair restores the packaged base interpreter from the
+  installer's managed Python and recreates venv metadata even if the stale
+  launcher still exists. Existing venv packages and user data are retained.
+- Regression coverage includes missing base/config, malformed marker,
+  GUI-only startup after removal, repair task scheduling and venv recreation.
+  Downloads and GPU execution are mocked in recovery tests; this follow-up
+  does not claim a new archive build or another GPU training run.
+- Follow-up review: reject linked venv descendants before rebuilding, and keep
+  live installation task status visible while runtime files are incomplete.
+- Regression result: 249 tests and 47 subtests passed (three existing
+  dependency deprecation warnings). On this host, the config-symlink test
+  simulates path resolution because native file-symlink creation is unavailable.

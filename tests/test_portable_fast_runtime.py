@@ -125,3 +125,135 @@ def test_gui_without_transformers_does_not_partially_patch_modelscope(monkeypatc
     assert hub.enable_china_hub(force=True) is False
     patch.assert_not_called()
     aliases.assert_not_called()
+
+
+def test_gui_only_verification_does_not_probe_uninstalled_fast(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    checker = runpy.run_path(str(ROOT / "scripts/portable/verify_fast_package.py"))
+    (tmp_path / "portable-profile.json").write_text('{"version":1,"profile":"gui-fast"}')
+    monkeypatch.setattr(checker["sys"], "executable", str(tmp_path / "python.exe"))
+    monkeypatch.setattr(checker["sys"], "prefix", str(tmp_path))
+    monkeypatch.setattr(checker["sys"], "base_prefix", str(tmp_path))
+    monkeypatch.setattr(checker["importlib"], "import_module",
+                        lambda name: SimpleNamespace(__file__=str(tmp_path / name / "__init__.py")))
+    def unexpected(*args, **kwargs):
+        pytest.fail("GUI startup must not probe the Fast runtime")
+    monkeypatch.setattr(checker["subprocess"], "run", unexpected)
+    checker["verify"](tmp_path, gui_only=True)
+    with pytest.raises((FileNotFoundError, RuntimeError)):
+        checker["verify"](tmp_path)
+
+
+def test_launcher_uses_gui_only_check():
+    text = (ROOT / "scripts/portable/launch_portable.bat").read_text(encoding="utf-8")
+    line = next(line for line in text.splitlines() if '" -s ' in line and "verify_fast_package.py" in line)
+    assert "--gui-only" in line
+
+
+@pytest.mark.parametrize("damage", ["base", "config", "marker"])
+def test_broken_portable_status_is_structured_and_path_is_readable(tmp_path, damage):
+    from mikazuki.engines.anima_fast.extension_state import ExtensionLayout, read_extension_status
+    fixture(tmp_path)
+    if damage == "base":
+        (tmp_path / ".python/python.exe").unlink()
+    elif damage == "config":
+        (tmp_path / ".venv/pyvenv.cfg").unlink()
+    else:
+        (tmp_path / "portable-runtime.json").write_text("{")
+    layout = ExtensionLayout(tmp_path)
+    assert layout.venv_python == tmp_path / ".venv/Scripts/python.exe"
+    status = read_extension_status(layout)
+    assert status.state == "broken"
+    assert "portable" in status.reason.lower()
+
+
+def test_rebuild_portable_base_preserves_packages_and_relocation(tmp_path):
+    fixture(tmp_path / "extension")
+    root = tmp_path / "extension"
+    (root / ".python/python.exe").unlink()
+    site = root / ".venv/Lib/site-packages"
+    site.mkdir(parents=True)
+    (site / "keep.py").write_text("data")
+    downloaded = tmp_path / "downloaded"
+    downloaded.mkdir()
+    (downloaded / "python.exe").write_text("new interpreter")
+    (downloaded / "Lib/site-packages").mkdir(parents=True)
+    (downloaded / "Lib/site-packages/private.py").touch()
+    result = runtime()["rebuild_base"](root, downloaded / "python.exe")
+    assert result == root / ".python/python.exe"
+    assert result.read_text() == "new interpreter"
+    assert not (root / ".python/Lib/site-packages").exists()
+    assert (site / "keep.py").read_text() == "data"
+    runtime()["repair"](root)
+
+
+def test_broken_runtime_audit_fails_without_running_engine(tmp_path, monkeypatch):
+    from mikazuki.engines.anima_fast import environment
+    from mikazuki.engines.anima_fast.extension_state import ExtensionLayout
+    fixture(tmp_path)
+    (tmp_path / ".python/python.exe").unlink()
+    def unexpected(*args, **kwargs):
+        pytest.fail("A broken portable base must not be executed")
+    monkeypatch.setattr(environment, "_collect_python_facts", unexpected)
+    result = environment.audit_environment(tmp_path, ExtensionLayout(tmp_path))
+    assert not result.ok
+    assert "Portable" in result.errors[0]
+
+
+def test_repair_route_can_schedule_broken_portable_runtime(tmp_path, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from mikazuki.engines.anima_fast import routes
+    from mikazuki.engines.anima_fast.extension_state import ExtensionLayout
+    fixture(tmp_path)
+    (tmp_path / ".python/python.exe").unlink()
+    layout = ExtensionLayout(tmp_path)
+    monkeypatch.setattr(routes, "default_layout", lambda root: layout)
+    monkeypatch.setattr(routes, "feature_enabled", lambda: True)
+    monkeypatch.setattr(routes, "anima_fast_runtime", lambda: SimpleNamespace(source_commit="abc"))
+    monkeypatch.setattr(routes, "resolve_install_source_root", lambda *a, **kw: tmp_path)
+    scheduled = []
+    def schedule(*args, **kwargs):
+        scheduled.append(args)
+        return "test-repair", {}
+    monkeypatch.setattr(routes, "start_install_task", schedule)
+    asyncio.run(routes.repair({"dry_run": False}))
+    assert len(scheduled) == 1
+
+
+def test_rebuild_rejects_linked_venv_config_before_writes(tmp_path, monkeypatch):
+    root = tmp_path / "extension"
+    fixture(root)
+    external = tmp_path / "external.cfg"
+    external.write_text("preserve")
+    config = root / ".venv/pyvenv.cfg"
+    config.unlink()
+    try:
+        config.symlink_to(external)
+    except OSError:
+        config.touch()
+        original_resolve = Path.resolve
+        monkeypatch.setattr(Path, "resolve", lambda path, *a, **kw:
+                            external if path == config else original_resolve(path, *a, **kw))
+    downloaded = tmp_path / "base"
+    downloaded.mkdir()
+    (downloaded / "python.exe").write_text("base")
+    with pytest.raises(RuntimeError, match="linked|outside"):
+        runtime()["rebuild_base"](root, downloaded / "python.exe")
+    assert external.read_text() == "preserve"
+
+
+def test_active_repair_state_survives_missing_portable_base(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from mikazuki.tasks import TaskStatus, tm
+    from mikazuki.engines.anima_fast.extension_state import (
+        ExtensionLayout, read_extension_status, write_install_state,
+    )
+    fixture(tmp_path)
+    (tmp_path / ".python/python.exe").unlink()
+    layout = ExtensionLayout(tmp_path)
+    write_install_state(layout, "installing", {"task_id": "repair-active"})
+    monkeypatch.setitem(tm.tasks, "repair-active", SimpleNamespace(status=TaskStatus.RUNNING))
+    status = read_extension_status(layout)
+    assert status.state == "installing"
+    assert status.facts["task_id"] == "repair-active"

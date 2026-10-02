@@ -556,7 +556,11 @@ def install_environment(
     facts["phase"] = "venv"
     _emit_progress(progress, "venv", "Creating Anima extension virtual environment")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "creating Anima extension venv")
-    if not plan.venv_python.is_file():
+    portable = sys.platform == "win32" and (plan.layout.root / "portable-runtime.json").is_file()
+    if portable:
+        from .portable_runtime import rebuild_base
+        base_python = rebuild_base(plan.layout.root, base_python)
+    if portable or not plan.venv_python.is_file():
         plan.venv_python.parent.parent.mkdir(parents=True, exist_ok=True)
         _run_streaming(
             [str(base_python), "-m", "venv", str(plan.venv_python.parent.parent)],
@@ -800,6 +804,15 @@ def audit_environment(
     root = project_root.resolve()
     errors: list[str] = []
     warnings: list[str] = []
+    if sys.platform == "win32":
+        from .portable_runtime import repair
+        try:
+            repair(layout.root)
+        except (OSError, ValueError, RuntimeError) as exc:
+            return AuditResult(
+                ok=False, errors=[f"Portable Fast runtime needs repair: {exc}"],
+                warnings=[], facts={"python": str(layout.venv_python)},
+            )
     if not layout.train_py.is_file():
         errors.append(f"anima: extension source train.py missing: {layout.train_py}")
     if not layout.venv_python.is_file():

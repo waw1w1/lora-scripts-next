@@ -15,7 +15,9 @@ def require_inside(path, root):
         raise RuntimeError(f"Runtime escapes package: {path}")
 
 
-def verify(root, cuda=False, audit=False):
+def verify(root, cuda=False, audit=False, gui_only=False):
+    if gui_only and (cuda or audit):
+        raise ValueError("GUI-only checks cannot replace a CUDA or engine audit")
     root = Path(root).resolve()
     profile = json.loads((root / "portable-profile.json").read_text(encoding="utf-8"))
     if profile != {"version": 1, "profile": "gui-fast"}:
@@ -29,6 +31,9 @@ def verify(root, cuda=False, audit=False):
         module = importlib.import_module(name)
         if getattr(module, "__file__", None):
             require_inside(module.__file__, root)
+    if gui_only:
+        print("Standalone GUI checks passed; engine readiness is managed in the GUI.")
+        return
     app = root / "Next-Trainer"
     extension = app / "extensions/anima_lora"
     repair = runpy.run_path(str(app / "mikazuki/engines/anima_fast/portable_runtime.py"))
@@ -75,5 +80,6 @@ if __name__ == "__main__":
     parser.add_argument("--portable-root", type=Path, required=True)
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--audit", action="store_true")
+    parser.add_argument("--gui-only", action="store_true")
     args = parser.parse_args()
-    verify(args.portable_root, args.cuda, args.audit)
+    verify(args.portable_root, args.cuda, args.audit, args.gui_only)
