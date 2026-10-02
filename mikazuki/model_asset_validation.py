@@ -6,7 +6,7 @@ import struct
 
 # Safetensors Dtype bit widths, including packed low-precision formats.
 DTYPE_BITS = {
-    'BOOL': 8, 'U8': 8, 'I8': 8, 'F8_E5M2': 8, 'F8_E4M3': 8, 'F8_E8M0': 8,
+    'BOOL': 8, 'U8': 8, 'I8': 8, 'F8_E5M2': 8, 'F8_E4M3': 8, 'F8_E4M3FN': 8, 'F8_E8M0': 8,
     'F8_E4M3FNUZ': 8, 'F8_E5M2FNUZ': 8, 'F4': 4, 'F6_E2M3': 6, 'F6_E3M2': 6,
     'I16': 16, 'U16': 16, 'F16': 16, 'BF16': 16, 'I32': 32, 'U32': 32, 'F32': 32,
     'C64': 64, 'F64': 64, 'I64': 64, 'U64': 64,
