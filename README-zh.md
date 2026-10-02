@@ -12,7 +12,7 @@ Next Trainer 把数据集管理、打标、标签编辑、训练配置与任务�
 
 > 你正在阅读 **`dev` 开发分支**。这里的能力可能尚未进入正式整合包；日常使用请优先选择 [Release](https://github.com/wochenlong/lora-scripts-next/releases)，不要把开发分支进度等同于已发布版本。
 
-![Anima Fast 训练界面](assets/readme/screenshot-anima-fast.png)
+![Qwen-Image 训练界面](assets/readme/screenshot-qwen-ui.png)
 
 *界面示例；实际选项以所用版本及引擎为准。*
 

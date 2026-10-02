@@ -12,7 +12,7 @@ Building on the Akegarasu training workflow, it integrates engines such as Kohya
 
 > This is the **`dev` development branch**. Features here may not be included in published portable packages. For everyday use, prefer a [Release](https://github.com/wochenlong/lora-scripts-next/releases); development progress is not a release announcement.
 
-![Anima Fast training workspace](assets/readme/screenshot-anima-fast.png)
+![Qwen-Image training workspace](assets/readme/screenshot-qwen-ui.png)
 
 *Example interface; available options depend on the version and engine.*
 
