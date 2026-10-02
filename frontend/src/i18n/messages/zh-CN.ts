@@ -173,6 +173,7 @@ export default {
       cancel: "取消",
     },
     diagnostics: {
+      toolkitLearningRate: "AI Toolkit 的 learning_rate 必须是大于等于 1e-12 的有限数值",
       dadaptScheduler: "DAdaptation 系列优化器建议将 lr_scheduler 设置为 constant",
       prodigyLr: "Prodigy 建议将 unet_lr、text_encoder_lr 设置为 1",
       oftSdxl: "OFT 当前仅对 SDXL 可用",
@@ -189,6 +190,11 @@ export default {
       "lumina2-lora": { title: "Lumina 2 LoRA", area: "Lumina 2 · Kohya-ss · LoRA" },
       "krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · Musubi-Tuner · LoRA" },
       "qwen-image-21-lora": { title: "Qwen-Image-2.1 LoRA", area: "Qwen-Image-2.1 · DiffSynth-Studio · LoRA" },
+      "ai-toolkit-sdxl-lora": { title: "SDXL LoRA", area: "SDXL · AI Toolkit · LoRA" },
+      "ai-toolkit-flux-lora": { title: "Flux LoRA", area: "Flux · AI Toolkit · LoRA" },
+      "ai-toolkit-anima-lora": { title: "Anima LoRA", area: "Anima · AI Toolkit · LoRA" },
+      "ai-toolkit-krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · AI Toolkit · LoRA" },
+      "ai-toolkit-qwen-image-21-lora": { title: "Qwen Image 2.1 LoRA", area: "Qwen Image 2.1 · AI Toolkit · LoRA" },
       "klein-lora": { title: "Klein LoRA", area: "FLUX.2 Klein · AI Toolkit · LoRA" },
     },
   },
@@ -647,7 +653,7 @@ export default {
         },
         "ai-toolkit": {
           name: "AI Toolkit",
-          summary: "可选训练引擎（ostris/ai-toolkit），支持 FLUX.2 Klein 等图像模型 LoRA。",
+          summary: "可选训练引擎（ostris/ai-toolkit），支持 SDXL、Flux、Klein、Krea 2、Anima、Qwen Image 2.1 LoRA。",
           sizeHint: "体积较大（通常数 GB），需额外磁盘与下载时间",
         },
       },
@@ -1037,7 +1043,7 @@ export default {
     },
   },
   aiToolkitGate: {
-    intro: "FLUX.2 Klein LoRA 训练由 AI Toolkit 独立运行环境承载；完成安装与审计后即可开始训练。",
+    intro: "SDXL、Flux、Klein、Krea 2、Anima 和 Qwen Image 2.1 LoRA 训练由 AI Toolkit 独立运行环境承载；完成安装与审计后即可开始训练。",
     auditTitle: "环境审计",
     installWorking: "安装进行中",
     install: "安装插件",

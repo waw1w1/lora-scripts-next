@@ -173,6 +173,7 @@ export default {
       cancel: "Cancel",
     },
     diagnostics: {
+      toolkitLearningRate: "AI Toolkit learning_rate must be a finite number of at least 1e-12",
       dadaptScheduler: "DAdaptation-family optimizers work best with lr_scheduler set to constant",
       prodigyLr: "Prodigy works best with unet_lr and text_encoder_lr set to 1",
       oftSdxl: "OFT is currently only available for SDXL",
@@ -189,6 +190,11 @@ export default {
       "lumina2-lora": { title: "Lumina 2 LoRA", area: "Lumina 2 · Kohya-ss · LoRA" },
       "krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · Musubi-Tuner · LoRA" },
       "qwen-image-21-lora": { title: "Qwen-Image-2.1 LoRA", area: "Qwen-Image-2.1 · DiffSynth-Studio · LoRA" },
+      "ai-toolkit-sdxl-lora": { title: "SDXL LoRA", area: "SDXL · AI Toolkit · LoRA" },
+      "ai-toolkit-flux-lora": { title: "Flux LoRA", area: "Flux · AI Toolkit · LoRA" },
+      "ai-toolkit-anima-lora": { title: "Anima LoRA", area: "Anima · AI Toolkit · LoRA" },
+      "ai-toolkit-krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · AI Toolkit · LoRA" },
+      "ai-toolkit-qwen-image-21-lora": { title: "Qwen Image 2.1 LoRA", area: "Qwen Image 2.1 · AI Toolkit · LoRA" },
       "klein-lora": { title: "Klein LoRA", area: "FLUX.2 Klein · AI Toolkit · LoRA" },
     },
   },
@@ -647,7 +653,7 @@ export default {
         },
         "ai-toolkit": {
           name: "AI Toolkit",
-          summary: "Optional engine (ostris/ai-toolkit) for FLUX.2 Klein LoRA and more image models.",
+          summary: "Optional engine (ostris/ai-toolkit) for SDXL, Flux, Klein, Krea 2, Anima and Qwen Image 2.1 LoRA.",
           sizeHint: "Large download (usually several GB); extra disk space and download time required",
         },
       },
@@ -1037,7 +1043,7 @@ export default {
     },
   },
   aiToolkitGate: {
-    intro: "FLUX.2 Klein LoRA training runs on the standalone AI Toolkit runtime; finish install and audit to start training.",
+    intro: "SDXL, Flux, Klein, Krea 2, Anima and Qwen Image 2.1 LoRA training use the standalone AI Toolkit runtime; finish install and audit to start training.",
     auditTitle: "Environment Audit",
     installWorking: "Installing",
     install: "Install Plugin",

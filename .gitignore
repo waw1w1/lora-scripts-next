@@ -1,3 +1,28 @@
+# Local runtime, dependencies and generated files
+/.runtime/
+/.cache/
+/.python/
+/venv/
+/.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+playwright-report/
+test-results/
+
+# Local application state
+/assets/config.json
+/config/.update_cache.json
+
 # Agent/plugin build output and local configuration
 # Keep portable user data outside version control.
 /sd-models/*
@@ -22,6 +47,9 @@ config/network.local.json
 # Isolated DiffSynth runtime (source and dependencies are installed on demand)
 extensions/diffsynth/
 /extensions/.diffsynth.lock
+
+# Isolated AI Toolkit runtime
+/extensions/ai_toolkit/
 
 # Local project memory
 /MEMORY.md

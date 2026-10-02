@@ -114,7 +114,7 @@ watch([model, engine, target], () => {
         <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />
       </template>
     </MusubiGatePage>
-    <AiToolkitGatePage v-else-if="resolved.engine === 'ai-toolkit'" bare>
+    <AiToolkitGatePage v-else-if="resolved.engine === 'ai-toolkit'" :schema-name="resolved.schemaName" bare>
       <template #form-top>
         <WorkbenchHeader />
         <TrainingSelector v-model:model="model" v-model:engine="engine" v-model:target="target" />

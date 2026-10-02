@@ -35,15 +35,15 @@ from .settings import RuntimeConfig, ensure_install_source_ready, load_backend_c
 
 
 IMPORT_PROBE = (
-    "import torch;"
-    "import sys, platform;"
-    "import importlib.util;"
+    "import torch, platform;"
+    "import diffusers, torchaudio;"
+    "import toolkit.config_modules;"
     "print(platform.python_version());"
     "print(torch.__version__);"
     "print(torch.cuda.is_available());"
-    "print(importlib.util.find_spec('toolkit') is not None);"
-    "print(importlib.util.find_spec('diffusers') is not None);"
-    "print(importlib.util.find_spec('torchaudio') is not None)"
+    "print(True);"
+    "print(True);"
+    "print(True)"
 )
 
 # Upstream requires Python 3.11 (dgx_instructions.md).
@@ -186,11 +186,8 @@ def probe_env(runtime: RuntimeConfig) -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONNOUSERSITE"] = "1"
     src = str(runtime.toolkit_root.resolve())
-    existing = env.get("PYTHONPATH", "")
-    parts = [p for p in existing.split(os.pathsep) if p]
-    if src not in parts:
-        parts.insert(0, src)
-    env["PYTHONPATH"] = os.pathsep.join(parts)
+    env.pop("PYTHONHOME", None)
+    env["PYTHONPATH"] = src
     return env
 
 
@@ -205,6 +202,15 @@ def audit_environment(
         "toolkit_root": str(runtime.toolkit_root),
         "python": str(runtime.python),
     }
+    from .manifest import UPSTREAM
+    from mikazuki.engines.vendor_bundle import snapshot_commit
+    recorded_commit = snapshot_commit(runtime.toolkit_root)
+    facts['source_commit'] = recorded_commit
+    facts['expected_commit'] = UPSTREAM['commit']
+    if recorded_commit and recorded_commit != UPSTREAM['commit']:
+        errors.append('AI Toolkit 源码版本已过期，请在设置中重新安装当前固定版本：' + UPSTREAM['commit'])
+    elif not recorded_commit:
+        warnings.append('AI Toolkit 源码没有 .source_commit 标记，无法核实版本；建议使用引擎安装器')
 
     if not ((runtime.toolkit_root / "run.py").is_file() and (runtime.toolkit_root / "toolkit").is_dir()):
         errors.append(
@@ -222,6 +228,7 @@ def audit_environment(
             result = subprocess.run(
                 [str(runtime.python), "-c", IMPORT_PROBE],
                 env=probe_env(runtime),
+                cwd=str(runtime.toolkit_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 timeout=180,
@@ -236,7 +243,7 @@ def audit_environment(
             lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
             if result.returncode != 0 or len(lines) < 6:
                 tail = " | ".join(lines[-3:]) if lines else "<no output>"
-                errors.append(f"ai-toolkit 依赖自检失败（import torch/toolkit）：{tail}")
+                errors.append(f"ai-toolkit 依赖自检失败（import torch/diffusers/torchaudio/toolkit.config_modules）：{tail}")
             else:
                 facts["python_version"] = lines[-6]
                 facts["torch_version"] = lines[-5]
