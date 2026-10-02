@@ -556,7 +556,11 @@ def install_environment(
     facts["phase"] = "venv"
     _emit_progress(progress, "venv", "Creating Anima extension virtual environment")
     write_install_state(plan.layout, STATE_INSTALLING, facts, "creating Anima extension venv")
-    if not plan.venv_python.is_file():
+    portable = sys.platform == "win32" and (plan.layout.root / "portable-runtime.json").is_file()
+    if portable:
+        from .portable_runtime import rebuild_base
+        base_python = rebuild_base(plan.layout.root, base_python)
+    if portable or not plan.venv_python.is_file():
         plan.venv_python.parent.parent.mkdir(parents=True, exist_ok=True)
         _run_streaming(
             [str(base_python), "-m", "venv", str(plan.venv_python.parent.parent)],
@@ -773,7 +777,7 @@ def _main_facts_in_process() -> dict:
         except importlib.metadata.PackageNotFoundError:
             packages[name] = None
     imports = {}
-    for name in ("cv2", "torch"):
+    for name in ("cv2",):
         try:
             __import__(name)
             imports[name] = True
@@ -787,13 +791,6 @@ def _main_facts_in_process() -> dict:
         "packages": packages,
         "imports": imports,
     }
-    try:
-        import torch
-
-        facts["torch_cuda_available"] = bool(torch.cuda.is_available())
-        facts["torch_cuda"] = getattr(torch.version, "cuda", "")
-    except Exception as exc:
-        facts["torch_error"] = repr(exc)
     return facts
 
 
@@ -807,6 +804,15 @@ def audit_environment(
     root = project_root.resolve()
     errors: list[str] = []
     warnings: list[str] = []
+    if sys.platform == "win32":
+        from .portable_runtime import repair
+        try:
+            repair(layout.root)
+        except (OSError, ValueError, RuntimeError) as exc:
+            return AuditResult(
+                ok=False, errors=[f"Portable Fast runtime needs repair: {exc}"],
+                warnings=[], facts={"python": str(layout.venv_python)},
+            )
     if not layout.train_py.is_file():
         errors.append(f"anima: extension source train.py missing: {layout.train_py}")
     if not layout.venv_python.is_file():
@@ -816,7 +822,7 @@ def audit_environment(
     main_facts = _main_facts_in_process() if main_python.resolve() == Path(sys.executable).resolve() else _collect_python_facts(
         main_python,
         sorted(set(MAIN_EXPECTED["exact"]) | {name for names in MAIN_EXPECTED.get("alternatives", {}).values() for name in names}),
-        ["cv2", "torch"],
+        ["cv2"],
         root,
     )
     anima_expected = _anima_expected_for_platform()

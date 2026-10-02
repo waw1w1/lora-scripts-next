@@ -154,22 +154,31 @@ function Copy-AnimaFastRuntime {
         throw "Anima Fast source missing .venv: $SourceRoot"
     }
     $dst = Join-Path $TrainerDir "extensions\anima_lora"
+    $resolvedTrainer = [System.IO.Path]::GetFullPath($TrainerDir).TrimEnd('\') + '\'
+    $resolvedDestination = [System.IO.Path]::GetFullPath($dst)
+    if (-not $resolvedDestination.StartsWith($resolvedTrainer, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Fast destination escapes the package checkout"
+    }
     New-Item -ItemType Directory -Path (Split-Path $dst -Parent) -Force | Out-Null
     if (Test-Path $dst) {
         Remove-Item $dst -Recurse -Force
     }
     Write-Host "  Bundling Anima Fast from: $SourceRoot"
-    # Keep install_state / source / .venv; drop bulky caches that are regenerable.
-    $xd = @("__pycache__", ".git", ".cache", "pip-cache", "__pycache__")
+    # Copy only engine code and its venv, never datasets/outputs or local settings.
+    $xd = @("__pycache__", ".git", ".cache", "pip-cache")
     $xdArgs = @()
     foreach ($name in $xd) { $xdArgs += "/XD"; $xdArgs += $name }
-    $null = robocopy $SourceRoot $dst /E /NFL /NDL /NJH /NJS /NC /NS /XF "*.pyc" $xdArgs
-    if ($LASTEXITCODE -ge 8) {
-        throw "robocopy Anima Fast failed (exit $LASTEXITCODE)"
+    foreach ($component in @("source", ".venv")) {
+        $null = robocopy (Join-Path $SourceRoot $component) (Join-Path $dst $component) /E /NFL /NDL /NJH /NJS /NC /NS /XF "*.pyc" $xdArgs
+        if ($LASTEXITCODE -ge 8) {
+            throw "robocopy Anima Fast failed (exit $LASTEXITCODE)"
+        }
     }
     if (-not (Test-Path (Join-Path $dst ".venv\Scripts\python.exe"))) {
         throw "Anima Fast bundle incomplete: missing .venv after copy"
     }
+    & $pythonExe -s (Join-Path $ProjectRoot "scripts/portable/bundle_fast_runtime.py") --source $SourceRoot --destination $dst
+    if ($LASTEXITCODE -ne 0) { throw "Fast base interpreter bundling failed" }
     if (-not (Test-Path (Join-Path $dst "install_state.json"))) {
         Write-Host "  WARNING: install_state.json missing; Fast UI may require re-audit" -ForegroundColor Yellow
     }
@@ -414,7 +423,7 @@ Write-Host "[2/6] Copying project files..." -ForegroundColor Cyan
 # Keep the tracked tree with its .git; never reconstruct it from a whitelist.
 Clone-SDTrainerGitMetadata -Destination $portableDir
 
-$packageFlavor = if ($BundleAnimaFast) { "full" } else { "lite" }
+$packageFlavor = if ($BundleAnimaFast) { "gui-fast" } else { "lite" }
 if (-not $PackageSuffix) {
     $PackageSuffix = $packageFlavor
 }
@@ -611,6 +620,8 @@ if ($SkipTaggerPrefetch) {
 }
 
 Write-Host ""
+if (-not $BundleAnimaFast) {
+# SD-family tokenizer prefetch is not a prerequisite for the Fast-only profile.
 Write-Host "[3b/6] Bundling SD/SDXL/Flux tokenizer cache (~8 MB, offline training)..." -ForegroundColor Cyan
 
 $tokenizerCacheDir = Join-Path $portableDir "tokenizer-cache"
@@ -665,6 +676,24 @@ foreach ($bundle in $tokenizerBundles) {
     }
 }
 
+}
+
+# Complete Fast host: install final GUI dependencies AFTER prefetch cleanup.
+if ($BundleAnimaFast) {
+    & $pythonExe -s $getPipPath --no-warn-script-location
+    if ($LASTEXITCODE -ne 0) { throw "GUI pip bootstrap failed" }
+    & $pythonExe -s -m pip install --no-warn-script-location -r (Join-Path $sdtDir "requirements.txt")
+    if ($LASTEXITCODE -ne 0) { throw "GUI dependency installation failed" }
+    & $pythonExe -s -m pip check
+    if ($LASTEXITCODE -ne 0) { throw "GUI dependency consistency check failed" }
+    [System.IO.File]::WriteAllText(
+        (Join-Path $portableDir "portable-profile.json"),
+        '{"version":1,"profile":"gui-fast"}',
+        (New-Object System.Text.UTF8Encoding $false))
+    & $pythonExe -s (Join-Path $sdtDir "scripts/portable/verify_fast_package.py") --portable-root $portableDir --audit
+    if ($LASTEXITCODE -ne 0) { throw "Standalone GUI + Fast validation failed" }
+}
+
 # ==== Step 4: Create launcher scripts ====
 
 Write-Host ""
@@ -713,7 +742,9 @@ $updateReleaseBat += "exit /b %errorlevel%`r`n"
 
 $updateDepsBat = "@echo off`r`nchcp 65001 >nul 2>&1`r`ncd /d `"%~dp0..`"`r`n"
 $updateDepsBat += "echo Updating Python dependencies...`r`n"
-$updateDepsBat += "`"python_embeded\python.exe`" -s -m pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/cu128`r`n"
+if (-not $BundleAnimaFast) {
+    $updateDepsBat += "`"python_embeded\python.exe`" -s -m pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/cu128`r`n"
+}
 $updateDepsBat += "`"python_embeded\python.exe`" -s -m pip install --upgrade -r `"Next-Trainer\requirements.txt`"`r`n"
 $updateDepsBat += "echo Done.`r`npause`r`n"
 [System.IO.File]::WriteAllText(
@@ -735,11 +766,11 @@ $xformersBat += "if errorlevel 1 (`r`n    echo [ERROR] xformers installation fai
 $xformersBat += "echo.`r`necho  Verifying...`r`n"
 $xformersBat += "`"%PYTHON_EXE%`" -s -c `"import xformers; print(f'  xformers {xformers.__version__} OK')`"`r`n"
 $xformersBat += "echo.`r`necho  Done! You can now use attn_mode = xformers.`r`necho.`r`npause`r`n"
-[System.IO.File]::WriteAllText(
+if (-not $BundleAnimaFast) { [System.IO.File]::WriteAllText(
     (Join-Path $portableDir "install_xformers.bat"),
     $xformersBat,
     (New-Object System.Text.UTF8Encoding $false)
-)
+) }
 Write-Host "  Created install_xformers.bat"
 
 # Root-level utility bat files
@@ -798,7 +829,11 @@ $readme = "Next Trainer Portable`r`n"
 $readme += "===================`r`n`r`n"
 $readme += "Quick Start:`r`n"
 $readme += "  1. Double-click run_gui.bat`r`n"
-$readme += "  2. First launch requires internet (downloads ~3 GB of PyTorch)`r`n"
+if ($BundleAnimaFast) {
+    $readme += "  2. GUI + Anima Fast dependencies are bundled; Kohya is optional.`r`n"
+} else {
+    $readme += "  2. First launch requires internet to install dependencies.`r`n"
+}
 $readme += "  3. Open http://127.0.0.1:28000 in browser`r`n`r`n"
 $readme += "Tagging:`r`n"
 $readme += "  Default WD tagger (wd14-convnextv2-v2) is bundled under tagger-models/wd14/`r`n"
@@ -834,6 +869,27 @@ $readme += "  xformers provides faster attention than PyTorch SDPA on most GPUs.
 $readme += "Flash Attention 2:`r`n"
 $readme += "  This portable package does NOT use flash-attn (uses xformers / PyTorch SDPA).`r`n"
 $readme += "  Do not pip install flash-attn into python_embeded. See README in Next-Trainer/.`r`n"
+if ($BundleAnimaFast) {
+    $readme = @"
+Next Trainer Portable - GUI + Anima Fast
+======================================
+
+Start: run_gui.bat, then open http://127.0.0.1:28000
+GUI dependencies and the Fast GPU runtime are included.
+Kohya is optional and is NOT installed in the GUI environment.
+Model weights and training datasets are not bundled.
+
+Move or extract the complete package, not individual runtime directories.
+Fast's bundled base Python is repaired automatically after relocation.
+Use the GUI engine manager for other engines.
+Do not install torch/xformers into python_embeded for Fast training.
+update/update_dependencies.bat updates GUI packages only.
+
+Close this package's GUI before running Update-Next-Trainer.bat.
+The Git updater follows the checkout's current branch.
+Keep datasets, models and training outputs backed up before updating.
+"@
+}
 [System.IO.File]::WriteAllText(
     (Join-Path $portableDir "README.txt"),
     $readme,
