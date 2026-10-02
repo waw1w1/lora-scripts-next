@@ -185,6 +185,13 @@ def read_extension_status(layout: ExtensionLayout) -> ExtensionStatus:
             "ready state is missing passing audit facts",
             facts,
         )
+    if state == STATE_READY:
+        from .manifest import UPSTREAM
+        from mikazuki.engines.vendor_bundle import snapshot_commit
+        recorded = snapshot_commit(layout.source)
+        if recorded and recorded != UPSTREAM['commit']:
+            return ExtensionStatus(STATE_INSTALLED_UNVERIFIED, str(layout.source), str(layout.venv_python),
+                                   'AI Toolkit 源码版本已过期，请重新安装当前固定版本', facts)
     if state in {STATE_READY, STATE_INSTALLING, STATE_AUDITING}:
         return ExtensionStatus(state, str(layout.source), str(layout.venv_python), "", facts)
     if state == STATE_BROKEN:
