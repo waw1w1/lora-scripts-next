@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from mikazuki.engines.diffsynth.environment import install_env, audit_environment
-from mikazuki.engines.diffsynth.extension_state import write_state, fingerprint
+from mikazuki.engines.diffsynth.extension_state import fingerprint_facts, write_state
 from mikazuki.engines.diffsynth.manifest import UPSTREAM
 from mikazuki.engines.diffsynth.resource import environment_lock
 from mikazuki.engines.diffsynth.settings import Runtime
@@ -35,7 +35,7 @@ def main():
             print(json.dumps(audit, ensure_ascii=False), flush=True)
             if not audit['ok']:
                 raise RuntimeError('; '.join(audit['errors']))
-            write_state(rt, 'ready', {**facts, 'audit': audit, 'source_commit': UPSTREAM['commit'], 'fingerprint': fingerprint(rt)})
+            write_state(rt, 'ready', {**facts, 'audit': audit, 'source_commit': UPSTREAM['commit'], **fingerprint_facts(rt)})
             print('[mikazuki-progress] ' + json.dumps({'percent': 100, 'message': '环境检查完成'}, ensure_ascii=False), flush=True)
         except Exception as exc:
             write_state(rt, 'broken', facts, str(exc))
