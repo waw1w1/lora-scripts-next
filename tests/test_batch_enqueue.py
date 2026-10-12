@@ -222,3 +222,33 @@ class BatchArchiveUniquenessTests(unittest.TestCase):
         # per-request autosave timestamps handed to the engine.
         self.assertEqual(len(dispatched), 2)
         self.assertEqual(len(set(dispatched)), 2)
+
+class SingleRunAutosaveUniquenessTests(unittest.TestCase):
+    """#334: a single submission must not reuse another one's snapshot name."""
+
+    def test_same_second_single_runs_get_distinct_timestamps(self):
+        import json as _json
+        import tempfile
+
+        class _Request:
+            def __init__(self, payload):
+                self._payload = payload
+
+            async def body(self):
+                return self._payload
+
+        dispatched = []
+
+        def fake_dispatch(model_train_type, config, ctx):
+            dispatched.append(ctx.timestamp)
+            return APIResponseSuccess(data={"task_id": "t"})
+
+        payload = _json.dumps({"model_train_type": "sd-lora", "output_name": "x"}).encode("utf-8")
+        with tempfile.TemporaryDirectory() as td,                 mock.patch.object(api, "dispatch_run", side_effect=fake_dispatch),                 mock.patch.object(api, "ensure_unique_output_name", return_value=None),                 mock.patch("mikazuki.app.api.os.getcwd", return_value=td):
+            asyncio.run(api.create_toml_file(_Request(payload)))
+            asyncio.run(api.create_toml_file(_Request(payload)))
+
+        self.assertEqual(len(dispatched), 2)
+        self.assertEqual(len(set(dispatched)), 2)
+        for timestamp in dispatched:
+            self.assertRegex(timestamp, r"^\d{8}-\d{6}-[0-9a-f]{4}$")

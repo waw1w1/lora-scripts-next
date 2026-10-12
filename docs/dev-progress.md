@@ -73,6 +73,13 @@ Anima 底模选择适用于 Kohya LoRA、Anima Fast LoRA 和 Anima 全量微调�
 
 详细环境、参数和平台限制以 [DiffSynth 指南](diffsynth.md) 为准。
 
+### Anima 的 TE 输出缓存（#333 已记录的限制）
+
+Anima（Kohya）开启文本编码器输出缓存后，`caption_dropout_rate` 会被固化进 `_anima_te.npz`，训练时从缓存读取，
+**改动该值不会生效且没有任何提示**。改动 caption dropout（或 shuffle/keep_tokens 等影响 TE 输出的项）后，
+请删除数据集目录下的 `_anima_te.npz` 缓存再重训；上游缓存键的一致性校验仍待跟进。
+
+
 ## 界面参考
 
 以下为历史界面截图，用于说明工作流程，不代表当前页面逐像素外观；数据集管理首页、标签编辑页与引擎列表已更新。

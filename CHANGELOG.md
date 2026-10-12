@@ -7,6 +7,13 @@
 
 （下一个开发周期：AI Toolkit 模型格式与训练体验，详见 docs/roadmap.md）
 
+### 修复（近一个月 issue 第二批）
+
+- **DiffSynth 软链权重误报（#390）**：路径规范化不再跟随叶子软链，AutoDL 那类「`*.safetensors` 名字指向无后缀实体」的挂载不再被后缀校验拒绝
+- **单条提交的 autosave 快照重名（#334）**：`/api/run` 的配置快照名加入随机后缀，同一秒内连续提交不再互相覆盖（批量提交此前已修）
+- **anima-fast 小数据集丢图提示（#338）**：预检在「图片数偏少 + train_batch_size>1」时明确警告上游 bucket 采样会整桶丢弃图片（及 1 batch 步数远低于预期的原因），并给出 batch_size=1 / num_repeats / bucket_reso_steps / validation_split_num 的处理建议
+- **Anima TE 缓存固化 caption_dropout_rate（#333）**：先在文档中写明「改动该值需删除 `_anima_te.npz` 再重训」的限制；上游缓存键的一致性校验待跟进
+
 ### 修复（近一个月 issue 第一批）
 
 - **Krea2 tokenizer 的 `extra_special_tokens` 为 list 时加载失败（#416）**：探测/下载/启动前会把旧的 list 形态规范化为 transformers 期望的 mapping，手动放置的 tokenizer 同样会被治好

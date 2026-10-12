@@ -270,6 +270,31 @@ def _int_value(value: Any, default: int = 0) -> int:
         return default
 
 
+# Below this image count, batch sizes > 1 are likely to hit upstream bucket
+# sampling, which drops every bucket holding fewer images than a batch (#338).
+BUCKET_DROP_HINT_MAX_IMAGES = 500
+
+
+def bucket_drop_warning(image_count: int, batch_size: int, validation_split: int) -> str | None:
+    """Warn when small datasets are likely to lose most images to bucket sampling.
+
+    The upstream sampler only forms batches inside one bucket, so images spread
+    over many aspect-ratio buckets are silently skipped (a single WARNING in the
+    launch log) and the run still finishes "normally". Surface it before launch.
+    """
+    training_images = image_count - max(0, validation_split)
+    if batch_size <= 1 or image_count <= 0 or training_images <= 0:
+        return None
+    if image_count >= BUCKET_DROP_HINT_MAX_IMAGES:
+        return None
+    return (
+        f"数据集只有 {image_count} 张图，而 train_batch_size={batch_size}：上游 bucket 采样只会在同一个桶内"
+        "组 batch，图片数不足一个 batch 的桶会被整桶丢弃（启动日志里只有一条 WARNING），宽高比差异大时可能"
+        "有大半图片完全不参与训练、步数也远低于预期。小数据集建议 train_batch_size=1，或提高 num_repeats、"
+        "放宽 bucket_reso_steps 合并近邻桶；把 validation_split_num 调到 0 可避免验证集图片白扣。"
+    )
+
+
 def _resolve(value: Any, base: Path) -> Path | None:
     if value is None or str(value).strip() == "":
         return None
@@ -571,6 +596,13 @@ def run_preflight(config: dict[str, Any], runtime: RuntimeConfig, probe: Depende
         captioned = sum(1 for image in images if image.with_suffix(".txt").is_file())
         if images and captioned < len(images):
             warnings.append(f"{len(images) - captioned} image(s) do not have .txt captions")
+        drop_hint = bucket_drop_warning(
+            len(images),
+            _int_value(config.get("train_batch_size") or config.get("batch_size"), 1),
+            _int_value(config.get("validation_split_num"), 0),
+        )
+        if drop_hint:
+            warnings.append(drop_hint)
 
     blocks_to_swap = _int_value(config.get("blocks_to_swap"), 0)
     cpu_offload = _truthy(config.get("cpu_offload_checkpointing"))
