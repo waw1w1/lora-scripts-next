@@ -241,7 +241,11 @@ async def normalize_export_config(request: Request):
 
 @router.post("/run")
 async def create_toml_file(request: Request):
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # Per-request random component: two submissions inside the same second must
+    # not share the autosave snapshot name, or the later write silently replaces
+    # the config the earlier task is about to read (#334). Same scheme as the
+    # batch endpoint below.
+    timestamp = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:4]}"
     autosave_dir = os.path.join(os.getcwd(), "config", "autosave")
     os.makedirs(autosave_dir, exist_ok=True)
     json_data = await request.body()
