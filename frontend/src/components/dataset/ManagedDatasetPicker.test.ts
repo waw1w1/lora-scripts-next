@@ -96,3 +96,32 @@ it("keeps a typed path when native folder selection is cancelled", async () => {
   expect((wrapper.get(".dataset-source-path input").element as HTMLInputElement).value).toBe("D:/existing")
   wrapper.unmount()
 })
+
+it("loads managed datasets when the controlled open prop opens the dialog (#440)", async () => {
+  const list = vi.spyOn(datasetsApi, "list").mockResolvedValue({
+    root: "/data", exists: true, datasets: [
+      { name: "test", path: "/data/test", overview: { state: "ready", file_count: 4, captioned_count: 3, total_bytes: 1024, updated_at: "2026-10-13T00:00:00Z" } },
+    ],
+  })
+  const wrapper = mount(ManagedDatasetPicker, {
+    props: { open: false, hideButton: true },
+    global: { plugins: [i18n], stubs: { ElDialog: { template: "<div><slot /><slot name='footer' /></div>" }, PathPickerDialog: true } },
+  })
+  await flushPromises()
+  // Closed on mount: no request.
+  expect(list).not.toHaveBeenCalled()
+
+  await wrapper.setProps({ open: true })
+  await flushPromises()
+  expect(list).toHaveBeenCalledTimes(1)
+  expect(wrapper.text()).toContain("test")
+
+  // Reopening refreshes, without stacking a second request per transition.
+  await wrapper.setProps({ open: false })
+  await flushPromises()
+  await wrapper.setProps({ open: true })
+  await flushPromises()
+  expect(list).toHaveBeenCalledTimes(2)
+
+  wrapper.unmount()
+})
