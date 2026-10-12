@@ -3,6 +3,11 @@
 本文件记录 **wochenlong/lora-scripts-next**（产品名 **Next Trainer**）面向镜像与 AutoDL 的发行说明；上游 kohya-ss/sd-scripts 的变更请见其仓库。
 
 ---
+## 未发布（dev）
+
+（下一个开发周期：AI Toolkit 模型格式与训练体验，详见 docs/roadmap.md）
+
+---
 ## v3.2.0 — 2026-10-11
 
 ### 整合包更新修复
