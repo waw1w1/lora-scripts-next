@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue"
+import { computed, onMounted, ref } from "vue"
 import { useI18n } from "vue-i18n"
+import { enginesApi } from "../api/engines"
+import type { EngineRuntimeState } from "../engines/catalog"
 import {
   TRAINING_ENGINES,
   TRAINING_MODELS,
@@ -19,6 +21,45 @@ const { t } = useI18n()
 
 const unsupportedEngines = computed(() => TRAINING_ENGINES.filter((item) => !isEngineSupported(model.value, item)))
 const unsupportedTargets = computed(() => TRAINING_TARGETS.filter((item) => !isTargetSupported(model.value, engine.value, item)))
+
+// Install state per engine, so the dropdown answers "is this engine installed?"
+// separately from "does this model support it?" (the latter greys an option out).
+const engineStates = ref<Partial<Record<TrainingEngine, EngineRuntimeState>>>({})
+const STATE_KEYS: Partial<Record<EngineRuntimeState, string>> = {
+  ready: "ready",
+  installed_unverified: "installedUnverified",
+  not_installed: "notInstalled",
+  unknown: "unknown",
+  installing: "installing",
+  auditing: "installing",
+  broken: "broken",
+  disabled: "disabled",
+  coming_soon: "comingSoon",
+}
+
+onMounted(async () => {
+  try {
+    const statuses = await enginesApi.list()
+    const next: Partial<Record<TrainingEngine, EngineRuntimeState>> = {}
+    for (const status of statuses) next[status.id] = status.state
+    engineStates.value = next
+  } catch {
+    // Install state is advisory here: fall back to plain engine names.
+  }
+})
+
+function engineOptionLabel(item: TrainingEngine): string {
+  const name = t(`training.selector.engines.${item}`)
+  const state = engineStates.value[item]
+  const key = state ? STATE_KEYS[state] : undefined
+  return key ? `${name} · ${t(`training.selector.engineStates.${key}`)}` : name
+}
+
+const missingEngines = computed(() => TRAINING_ENGINES.filter((item) => {
+  if (!isEngineSupported(model.value, item)) return false
+  const state = engineStates.value[item]
+  return state === "not_installed" || state === "broken"
+}))
 </script>
 
 <template>
@@ -33,10 +74,11 @@ const unsupportedTargets = computed(() => TRAINING_TARGETS.filter((item) => !isT
         </label>
         <label>{{ t("training.selector.engine") }}
           <select v-model="engine">
-            <option v-for="item in TRAINING_ENGINES" :key="item" :value="item" :disabled="!isEngineSupported(model, item)">{{ t(`training.selector.engines.${item}`) }}</option>
+            <option v-for="item in TRAINING_ENGINES" :key="item" :value="item" :disabled="!isEngineSupported(model, item)">{{ engineOptionLabel(item) }}</option>
           </select>
         </label>
         <p v-if="unsupportedEngines.length" class="selector-hint">{{ t("training.selector.unsupportedForModel", { list: unsupportedEngines.map((item) => t(`training.selector.engines.${item}`)).join(" / ") }) }}</p>
+        <p v-if="missingEngines.length" class="selector-hint">{{ t("training.selector.engineMissing", { list: missingEngines.map((item) => t(`training.selector.engines.${item}`)).join(" / ") }) }}</p>
       </div>
     </div>
     <div class="selector-card">
