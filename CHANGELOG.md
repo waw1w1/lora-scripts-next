@@ -7,6 +7,10 @@
 
 （下一个开发周期：AI Toolkit 模型格式与训练体验，详见 docs/roadmap.md）
 
+### 新增
+
+- **Windows 启动器 `NextTrainer.exe`（#435）**：放在整合包根目录（与 `启动.bat` 并存）。双击启动等价于 `启动.bat`，但接管进程树：关窗 / `Q` 真正停掉服务，端口占用或启动失败给中文提示，`U` 一键更新（先停服 → 运行更新脚本 → `R` 重启）。C# NativeAOT 编译（约 5 MB，无 .NET 运行时依赖）。构建脚本 `build-scripts/06-build-launcher.ps1`，已接入 `build_portable_2026_full.ps1` 的打包流程
+
 ### 修复（近一个月 issue 第二批）
 
 - **DiffSynth 软链权重误报（#390）**：路径规范化不再跟随叶子软链，AutoDL 那类「`*.safetensors` 名字指向无后缀实体」的挂载不再被后缀校验拒绝
