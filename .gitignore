@@ -148,3 +148,7 @@ extensions/diffsynth/
 
 # User-owned settings, credentials, presets and task archives.
 /user_data/
+
+# launcher (.NET) build artifacts
+launcher/bin/
+launcher/obj/
