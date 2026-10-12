@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from mikazuki.model_assets import (
     download_assets,
     krea2_tokenizer_dir,
     manifest_for,
+    normalize_tokenizer_config,
     patch_krea2_tokenizer_path,
     resolve_train_type,
 )
@@ -190,6 +192,70 @@ class Krea2TokenizerPatchTests(unittest.TestCase):
             self.assertFalse(patch_krea2_tokenizer_path(source_root, tokenizer_dir, lambda line: None))
             encoder = source_root / "src" / "musubi_tuner" / "krea2" / "krea2_encoder.py"
             self.assertEqual(encoder.read_text(encoding="utf-8"), self.ENCODER)
+
+
+class TokenizerConfigNormalizeTests(unittest.TestCase):
+    """#416: legacy list form of extra_special_tokens breaks tokenizer loading."""
+
+    def _write_config(self, root: Path, payload) -> Path:
+        config_path = root / "tokenizer_config.json"
+        if isinstance(payload, str):
+            config_path.write_text(payload, encoding="utf-8")
+        else:
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+        return config_path
+
+    def test_list_form_is_converted_to_mapping(self):
+        with tempfile.TemporaryDirectory() as td:
+            config_path = self._write_config(
+                Path(td),
+                {"tokenizer_class": "Qwen2TokenizerFast", "extra_special_tokens": ["<|a|>", "<|b|>"]},
+            )
+            logs = []
+            self.assertTrue(normalize_tokenizer_config(Path(td), logs.append))
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["extra_special_tokens"], {"additional_special_tokens": ["<|a|>", "<|b|>"]})
+        self.assertEqual(payload["tokenizer_class"], "Qwen2TokenizerFast")
+        self.assertTrue(any("extra_special_tokens" in line for line in logs))
+
+    def test_mapping_form_is_left_untouched(self):
+        original = {"extra_special_tokens": {"additional_special_tokens": ["<|a|>"]}}
+        with tempfile.TemporaryDirectory() as td:
+            config_path = self._write_config(Path(td), original)
+            before = config_path.read_text(encoding="utf-8")
+
+            self.assertFalse(normalize_tokenizer_config(Path(td), lambda line: None))
+            after = config_path.read_text(encoding="utf-8")
+
+        self.assertEqual(after, before)
+
+    def test_missing_or_malformed_config_is_safe(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            self.assertFalse(normalize_tokenizer_config(root, lambda line: None))
+            config_path = self._write_config(root, "{not json")
+            self.assertFalse(normalize_tokenizer_config(root, lambda line: None))
+            self.assertEqual(config_path.read_text(encoding="utf-8"), "{not json")
+
+    def test_krea2_patch_normalizes_before_pointing_at_the_dir(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source_root = root / "musubi"
+            encoder_dir = source_root / "src" / "musubi_tuner" / "krea2"
+            encoder_dir.mkdir(parents=True)
+            (encoder_dir / "krea2_encoder.py").write_text(Krea2TokenizerPatchTests.ENCODER, encoding="utf-8")
+            tokenizer_dir = root / "tokenizer"
+            tokenizer_dir.mkdir()
+            (tokenizer_dir / "tokenizer.json").write_text("{}", encoding="utf-8")
+            (tokenizer_dir / "tokenizer_config.json").write_text(
+                json.dumps({"extra_special_tokens": ["<|a|>"]}), encoding="utf-8"
+            )
+
+            self.assertTrue(patch_krea2_tokenizer_path(source_root, tokenizer_dir, lambda line: None))
+            payload = json.loads((tokenizer_dir / "tokenizer_config.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["extra_special_tokens"], {"additional_special_tokens": ["<|a|>"]})
 
 
 if __name__ == "__main__":

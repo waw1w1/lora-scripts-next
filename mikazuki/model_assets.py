@@ -17,6 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+import json
 import os
 import re
 
@@ -189,6 +190,40 @@ def dir_complete(path: Path) -> bool:
     return all((path / name).is_file() for name in TOKENIZER_REQUIRED)
 
 
+_TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
+
+
+def normalize_tokenizer_config(tokenizer_dir: Path, log: Callable[[str], None] = print) -> bool:
+    """Rewrite a tokenizer_config whose ``extra_special_tokens`` is a legacy list.
+
+    transformers >= 4.5x expects a mapping (``{"additional_special_tokens": [...]}``);
+    a bare list raises while loading the tokenizer, which used to surface as an
+    opaque TypeError during preflight/training (#416). Idempotent, and never
+    touches a config that is already in the mapping form.
+    """
+    config_path = Path(tokenizer_dir) / _TOKENIZER_CONFIG_NAME
+    if not config_path.is_file():
+        return False
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        log(f"[tokenizer] cannot read {config_path} ({exc}); left unchanged")
+        return False
+    if not isinstance(payload, dict):
+        return False
+    value = payload.get("extra_special_tokens")
+    if not isinstance(value, list):
+        return False
+    payload["extra_special_tokens"] = {
+        "additional_special_tokens": [str(item) for item in value]
+    }
+    tmp = config_path.with_name(config_path.name + ".mikazuki-tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, config_path)
+    log(f"[tokenizer] extra_special_tokens list -> mapping in {config_path}")
+    return True
+
+
 def asset_dir_complete(asset: AssetDef, path: Path) -> bool:
     if asset.key == "diffsynth_model_dir":
         from mikazuki.engines.diffsynth.adapter import weight_files
@@ -232,6 +267,7 @@ def patch_krea2_tokenizer_path(source_root: Path, tokenizer_dir: Path, log: Call
     if not encoder.is_file():
         return False
     tokenizer_dir = Path(tokenizer_dir)
+    normalize_tokenizer_config(tokenizer_dir, log)
     if not dir_complete(tokenizer_dir):
         return False
     text = encoder.read_text(encoding="utf-8")
@@ -308,6 +344,7 @@ def patch_ideogram4_source(source_root: Path, tokenizer_dir: Path, log: Callable
     module = Path(source_root) / IDEOGRAM4_UTILS_REL
     if not module.is_file():
         return False
+    normalize_tokenizer_config(Path(tokenizer_dir), log)
     text = module.read_text(encoding="utf-8")
     patched = text
     if _ROTARY_PATCH_MARK not in patched:
@@ -403,8 +440,11 @@ def download_assets(
         if asset is None:
             raise ValueError(f"未知资产: {item.get('key')}")
         if asset.kind == "dir":
-            _download_dir_asset(asset, source, _target_path(str(item.get("path") or asset.default_path), project_root), log)
+            target_dir = _target_path(str(item.get("path") or asset.default_path), project_root)
+            _download_dir_asset(asset, source, target_dir, log)
             log(f"[done] {asset.label}")
+            if asset.key == "tokenizer":
+                normalize_tokenizer_config(target_dir, log)
             if train_type == "krea2-lora" and asset.key == "tokenizer":
                 patch_krea2_tokenizer_everywhere(project_root, log)
             elif train_type == "ideogram4-lora" and asset.key == "tokenizer":

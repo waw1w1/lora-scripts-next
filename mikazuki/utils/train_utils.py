@@ -5,7 +5,7 @@ import re
 import shutil
 import sys
 import json
-from typing import Dict
+from typing import Dict, Optional
 
 import toml
 
@@ -268,6 +268,35 @@ def read_safetensors_metadata(path) -> Dict:
         return json.loads(meta)
 
 
+# vendor/sd-scripts/library/anima_utils.py builds the Anima DiT with num_blocks=28;
+# a 2.9B checkpoint carries more blocks and can only be trained by Anima Fast (#408).
+KOHYA_ANIMA_MAX_BLOCKS = 28
+
+
+def anima_checkpoint_block_count(path) -> Optional[int]:
+    """DiT block count from a safetensors header, or None when unreadable / not Anima.
+
+    Reads only the JSON header: cheap, and never loads weights or touches the GPU.
+    """
+    try:
+        metadata = read_safetensors_metadata(path)
+    except Exception:  # noqa: BLE001 - a broken header simply means "cannot tell"
+        return None
+    if not isinstance(metadata, dict):
+        return None
+    highest = None
+    for key in metadata:
+        if not isinstance(key, str):
+            continue
+        match = re.match(r"^blocks\.(\d+)\.", key)
+        if match is None:
+            continue
+        index = int(match.group(1))
+        if highest is None or index > highest:
+            highest = index
+    return None if highest is None else highest + 1
+
+
 def guess_model_type(path):
     if path.endswith("safetensors"):
         metadata = read_safetensors_metadata(path)
@@ -286,6 +315,21 @@ def guess_model_type(path):
 
 def validate_model(model_name: str, training_type: str = "sd-lora"):
     if training_type in ["anima-lora", "sd3-lora", "anima-finetune"]:
+        # vendor/sd-scripts/library/anima_utils.py hardcodes num_blocks=28, so an
+        # Anima 2.9B checkpoint only fails later with a wall of "Unexpected keys ...
+        # blocks.28.*" names. Detect it from the safetensors header (no weights, no
+        # GPU) and point the user at the engine that supports it (#408).
+        if os.path.isfile(model_name) and str(model_name).lower().endswith(".safetensors"):
+            try:
+                blocks = anima_checkpoint_block_count(model_name)
+            except Exception as exc:  # noqa: BLE001 - unreadable headers surface in the trainer
+                log.warning(f"Can't inspect model file {model_name}: {exc}")
+                blocks = None
+            if blocks is not None and blocks > KOHYA_ANIMA_MAX_BLOCKS:
+                return False, (
+                    f"检测到 Anima 2.9B 底模（{blocks} 个 block），Kohya 引擎不支持该规格。"
+                    "请改用 Anima Fast 引擎（可在「设置 → 训练引擎」中安装），或改用 Anima 2B 底模。"
+                )
         return True, "ok"
 
     if os.path.exists(model_name):
