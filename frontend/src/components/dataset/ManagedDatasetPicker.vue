@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { Folder, ArrowLeft } from "@element-plus/icons-vue"
 import { ElDialog } from "element-plus"
 import { useI18n } from "vue-i18n"
@@ -64,10 +64,27 @@ async function browseFolder() {
     picking.value = false
   }
 }
+function initializeForOpen() {
+  source.value = "managed"
+  serverPath.value = props.initialPath || ""
+  void browse()
+}
 function toggle() {
   if (open.value) close()
-  else { open.value = true; source.value = "managed"; serverPath.value = props.initialPath || ""; void browse() }
+  else { open.value = true; initializeForOpen() }
 }
+// Controlled hosts (DatasetEditorPage) open the dialog through the `open` prop with
+// the internal button hidden, so toggle() never ran and the managed dataset list
+// stayed empty (#440). Run the same initialisation when the dialog opens that way;
+// browse() already discards stale responses through its generation counter.
+watch(
+  () => props.open === true,
+  (isOpen, wasOpen) => {
+    if (!isOpen || wasOpen) return
+    initializeForOpen()
+  },
+  { immediate: true },
+)
 function back() {
   if (!content.value?.relative_path) void browse()
   else void browse(content.value.name, content.value.relative_path.split("/").slice(0, -1).join("/"))
