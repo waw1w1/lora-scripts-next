@@ -23,6 +23,7 @@
 - **Krea2 tokenizer 的 `extra_special_tokens` 为 list 时加载失败（#416）**：探测/下载/启动前会把旧的 list 形态规范化为 transformers 期望的 mapping，手动放置的 tokenizer 同样会被治好
 - **Kohya 加载 Anima 2.9B 前明确拦截（#408）**：只读 safetensors 头部统计 block 数，超过 28 即拒绝并提示改用 Anima Fast，不再等到加载时抛一串 `blocks.28.*` 权重名
 - **DiffSynth 指纹不再含 mtime（#410）**：目录拷贝 / 云镜像 / 备份还原导致的时间戳变化不再误报环境异常；旧状态一次性迁移，不要求重装；内容改动仍能识别
+  - 已回移到 `main`（PR #438）。**预装 DiffSynth 的定制镜像需同步 `mikazuki/engines/diffsynth/extension_state.py` 与 `install_worker.py` 后重建镜像**；只改 `install_state.json` 不算修复（时间戳再变仍会复发）——文件到位后，现存实例在下一次状态检查时会自动迁移，无需重装
 
 ---
 ## v3.2.0 — 2026-10-11
