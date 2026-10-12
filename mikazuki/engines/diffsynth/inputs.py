@@ -3,6 +3,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 
 from .formats import conversion_plan
 import re
@@ -21,7 +22,13 @@ class InputError(ValueError):
 
 def absolute(value, root):
     path = Path(str(value)).expanduser()
-    return (path if path.is_absolute() else root / path).resolve()
+    if not path.is_absolute():
+        path = root / path
+    # Deliberately not resolve(): AutoDL-style mounts expose a '*.safetensors'
+    # name that points at an extension-less real file, and weight_files() checks
+    # the suffix of the name the user picked (#390). normpath/abspath still
+    # normalise '..' and relative roots without touching the filesystem.
+    return Path(os.path.abspath(str(path)))
 
 
 def required_path(config, key, root):
