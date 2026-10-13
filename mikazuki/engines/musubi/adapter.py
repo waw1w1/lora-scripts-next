@@ -330,6 +330,33 @@ def _coerce_scalar(key: str, value: Any) -> Any:
     return value
 
 
+def fp8_base_hint(dit_path: Any) -> bool:
+    """True when the DiT checkpoint is already FP8 (#417).
+
+    musubi rejects ``--fp8_base/--fp8_scaled`` for an already-quantized base, so
+    the adapter closes them instead of letting the run fail upstream. Reads only
+    the safetensors header; unreadable files simply report False and are handled
+    by preflight.
+    """
+    path = str(dit_path or "").strip()
+    if not path.lower().endswith(".safetensors"):
+        return False
+    from mikazuki.utils.train_utils import read_safetensors_metadata
+
+    try:
+        header = read_safetensors_metadata(path)
+    except Exception:  # noqa: BLE001 - malformed headers surface in preflight
+        return False
+    if not isinstance(header, dict):
+        return False
+    for key, entry in header.items():
+        if key == "__metadata__" or not isinstance(entry, dict):
+            continue
+        if str(entry.get("dtype", "")).upper().startswith("F8"):
+            return True
+    return False
+
+
 def resolve_path(value: Any, base: Path) -> str:
     path = Path(str(value))
     if not path.is_absolute():
@@ -473,13 +500,23 @@ def adapt_config(
         # Krea 2: fp8_base and fp8_scaled must be paired. Trainer asserts
         # ``fp8_scaled requires fp8_base``; plain fp8_base without scaled is also rejected.
         # Prefer both ON when either is requested (product default). Both OFF is allowed.
-        fp8_base = bool(values.get("fp8_base"))
-        fp8_scaled = bool(values.get("fp8_scaled"))
-        if fp8_base or fp8_scaled:
-            if not (fp8_base and fp8_scaled):
-                values["fp8_base"] = True
-                values["fp8_scaled"] = True
-                warnings.append("Krea 2 的 fp8 须同时开启 fp8_base 与 fp8_scaled，已自动成对开启")
+        if fp8_base_hint(values.get("dit")):
+            # #417: an already-FP8 DiT makes musubi reject the pair outright;
+            # "both off" is a legal state, so close them and say why.
+            dropped = [key for key in ("fp8_base", "fp8_scaled") if values.pop(key, None) is not None]
+            if dropped:
+                warnings.append(
+                    "底模已是 FP8 权重，musubi 会拒绝再开 fp8_base/fp8_scaled；已自动关闭"
+                    f"（{'/'.join(dropped)}）。两个都关是合法状态，无需改动上游。"
+                )
+        else:
+            fp8_base = bool(values.get("fp8_base"))
+            fp8_scaled = bool(values.get("fp8_scaled"))
+            if fp8_base or fp8_scaled:
+                if not (fp8_base and fp8_scaled):
+                    values["fp8_base"] = True
+                    values["fp8_scaled"] = True
+                    warnings.append("Krea 2 的 fp8 须同时开启 fp8_base 与 fp8_scaled，已自动成对开启")
     else:
         # Ideogram 4's base is always FP8; upstream takes no --fp8_base/--fp8_scaled.
         dropped = [key for key in ("fp8_base", "fp8_scaled") if values.pop(key, None) is not None]
@@ -534,6 +571,16 @@ def adapt_config(
         for key in ("compile_backend", "compile_mode", "compile_dynamic", "compile_fullgraph", "compile_cache_size_limit"):
             values.pop(key, None)
         warnings.append("compile 在 Windows 上不可用（依赖仅限 Linux 的 Triton），已自动关闭")
+
+    # musubi natively prefers epochs, so a user setting max_train_steps=100 while
+    # also filling epochs would silently run epochs*steps_per_epoch instead (#418).
+    # Contract with the form: steps win; drop epochs and say so.
+    if not is_empty(values.get("max_train_steps")) and not is_empty(values.get("max_train_epochs")):
+        values.pop("max_train_epochs", None)
+        warnings.append(
+            "同时填写了 max_train_steps 与 max_train_epochs：musubi 以 epoch 优先，为避免实际步数与预期不符，"
+            "已按「步数优先」只保留 max_train_steps（想按 epoch 训练请清空步数）"
+        )
 
     values["network_module"] = spec.network_module
     if not is_empty(source.get("network_module")) and source["network_module"] != spec.network_module:

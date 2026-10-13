@@ -35,8 +35,8 @@ Schema.intersect([
     }).description("保存设置"),
 
     Schema.object({
-        max_train_epochs: Schema.number().min(1).default(16).description("最大训练 epoch（轮数）"),
-        max_train_steps: Schema.number().min(1).description("最大训练步数（设置了 epoch 时由 epoch 推导，可不填）"),
+        max_train_epochs: Schema.number().min(1).default(16).description("最大训练 epoch（轮数）。与 max_train_steps 同时填写时以步数为准，此项会被忽略并提示"),
+        max_train_steps: Schema.number().min(1).description("最大训练步数。与 max_train_epochs 同时填写时以步数为准（epoch 会被忽略并提示）；只填 epoch 时由 epoch 推导，可不填"),
         train_batch_size: Schema.number().min(1).default(1).description("批量大小, 越高显存占用越高"),
         gradient_checkpointing: Schema.boolean().default(true).description("梯度检查点"),
         gradient_accumulation_steps: Schema.number().min(1).default(1).description("梯度累加步数"),
@@ -70,8 +70,8 @@ Schema.intersect([
 
     Schema.object({
         mixed_precision: Schema.union(["bf16"]).default("bf16").description("训练混合精度（Krea 2 仅支持 bf16）"),
-        fp8_base: Schema.boolean().default(true).description("DiT 基础权重使用 fp8，大幅降低显存占用。须与 fp8_scaled 同时开启（默认都开）；只开一个会训不起来"),
-        fp8_scaled: Schema.boolean().default(true).description("fp8 scaled（动态缩放）。须与 fp8_base 同时开启（默认都开）；只开一个会训不起来"),
+        fp8_base: Schema.boolean().default(true).description("DiT 基础权重使用 fp8，大幅降低显存占用。须与 fp8_scaled 同时开启（默认都开）；只开一个会训不起来。若底模已是 FP8 权重会自动关闭并提示"),
+        fp8_scaled: Schema.boolean().default(true).description("fp8 scaled（动态缩放）。须与 fp8_base 同时开启（默认都开）；只开一个会训不起来。若底模已是 FP8 权重会自动关闭并提示"),
         blocks_to_swap: Schema.number().min(0).max(200).step(1).default(0).description("交换到内存的 DiT block 数量以节省显存（与 turbo_dit 互斥）"),
         sdpa: Schema.boolean().default(true).description("启用 sdpa"),
         sage_attn: Schema.boolean().default(false).description("启用 SageAttention（需要额外安装）"),
