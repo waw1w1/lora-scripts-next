@@ -78,7 +78,14 @@ describe("AI Toolkit Ideogram 4 schema", () => {
     expect(config.text_encoder_path).toBe("./sd-models/ideogram4/qwen3vl_8b_fp8_scaled.safetensors")
     expect(config.text_encoder_tokenizer_path).toBe("./sd-models/ideogram4/qwen3-vl-8b-instruct")
     expect(config).not.toHaveProperty("model_config_dir")
+    // The unconditional-pass LoRA is optional: absent by default, carried when set.
+    expect(createDefaultModel(ideogram4)).not.toHaveProperty("unconditional_lora_path")
     expect(validateModel(ideogram4, model)).toEqual({})
+    const withLora = serializeModel(ideogram4, {
+      ...model,
+      unconditional_lora_path: "./sd-models/ideogram4/ideogram_4_unconditional_lora_r16.safetensors",
+    })
+    expect(withLora.unconditional_lora_path).toBe("./sd-models/ideogram4/ideogram_4_unconditional_lora_r16.safetensors")
   })
 
   it("model_directory keeps the diffusers layout option without a VAE path", () => {

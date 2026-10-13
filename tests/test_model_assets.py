@@ -87,7 +87,7 @@ class ModelAssetsManifestTests(unittest.TestCase):
 
     def test_ai_toolkit_ideogram4_manifest_reuses_comfy_org_sources(self):
         assets = {asset.key: asset for asset in manifest_for("ai-toolkit-ideogram4-lora")}
-        self.assertEqual(set(assets), {"dit", "vae", "text_encoder", "text_encoder_tokenizer"})
+        self.assertEqual(set(assets), {"dit", "vae", "text_encoder", "text_encoder_tokenizer", "unconditional_lora"})
         self.assertEqual(assets["dit"].hf_repo, "Comfy-Org/Ideogram-4")
         self.assertEqual(assets["dit"].hf_file, "diffusion_models/ideogram4_fp8_scaled.safetensors")
         self.assertIn("非商用", assets["dit"].label)
@@ -96,6 +96,10 @@ class ModelAssetsManifestTests(unittest.TestCase):
         self.assertEqual(te.kind, "file")
         self.assertEqual(te.hf_repo, "Comfy-Org/Ideogram-4")
         self.assertEqual(te.hf_file, "text_encoders/qwen3vl_8b_fp8_scaled.safetensors")
+        lora = assets["unconditional_lora"]
+        self.assertTrue(lora.optional)
+        self.assertEqual(lora.hf_repo, "ostris/ideogram_4_unconditional_lora")
+        self.assertEqual(lora.hf_file, "ideogram_4_unconditional_lora_r16.safetensors")
         tokenizer = assets["text_encoder_tokenizer"]
         self.assertEqual(tokenizer.kind, "dir")
         self.assertEqual(tokenizer.hf_repo, "Qwen/Qwen3-VL-8B-Instruct")

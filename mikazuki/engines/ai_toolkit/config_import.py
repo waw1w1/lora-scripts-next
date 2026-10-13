@@ -5,7 +5,8 @@ from .capabilities import MODELS, TRAIN_TYPES, family, schema_name
 from .model_inputs import absolute
 
 UI_FIELDS = set('''model_train_type model_input_mode model_path model_config_dir model_variant
-dit_path text_encoder_path vae_path train_data_dir training_task control_data_dirs caption_extension
+dit_path text_encoder_path text_encoder_tokenizer_path unconditional_lora_path vae_path
+train_data_dir training_task control_data_dirs caption_extension
 caption_dropout_rate shuffle_caption cache_latents_to_disk resolution dataset_repeats max_train_steps
 output_name output_dir logging_dir quantize quantize_te qtype low_vram layer_offloading optimizer_type
 train_batch_size gradient_accumulation_steps gradient_checkpointing learning_rate lr_scheduler

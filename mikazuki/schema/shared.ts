@@ -359,6 +359,10 @@
                 } else {
                     fields.text_encoder_path = path("文本编码器 / Text encoder（Qwen3-VL-8B 本地目录，含 config、tokenizer 与权重）", true)
                 }
+                // Optional: only used for the unconditional (negative) CFG sampling
+                // pass; leaving it empty keeps single-DiT CFG sampling.
+                fields.unconditional_lora_path = Schema.string().role('filepicker', { type: "model-file" })
+                    .description("可选：无条件采样 LoRA 路径（非对称 CFG 预览用；不填则采样走单 DiT CFG）")
             }
             return Schema.object(fields)
         })))
