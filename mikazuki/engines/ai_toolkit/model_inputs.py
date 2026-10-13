@@ -82,6 +82,13 @@ def model_inputs(source, root, variant):
             components = {"transformer": str(path), "vae": str(absolute(source.get("vae_path"), root))}
             model["model_kwargs"]["next_trainer_comfy_components"] = components
             assets["components"] = components
+        # Optional: the unconditional-pass LoRA for asymmetric-CFG sampling. Without
+        # it, sampling falls back to single-DiT CFG (upstream ignores a null path).
+        unconditional = str(source.get("unconditional_lora_path") or "").strip()
+        if unconditional:
+            resolved_lora = str(absolute(unconditional, root))
+            model["unconditional_lora_path"] = resolved_lora
+            assets["unconditional_lora"] = resolved_lora
     elif mode == "single_file":  # SDXL / SD 1.5 checkpoint plus local Diffusers configs/tokenizers
         config_dir = source.get("model_config_dir") or (SD15_CONFIG_DIR if kind == "sd15" else None)
         extras = str(absolute(config_dir, root))

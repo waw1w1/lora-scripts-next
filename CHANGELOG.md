@@ -22,6 +22,7 @@
 - **max_train_steps 与 max_train_epochs 同时填写（#418）**：musubi 侧以 epoch 优先，会让「steps=100」实跑到按 epoch 推导的步数；现在按**步数优先**只保留 max_train_steps 并明确提示，表单两处文案也写清「以步数为准」
 
 ### 新增
+- **Ideogram 4（AI Toolkit）无条件采样 LoRA 设为可选（#446 跟进）**：新增可选资源 `unconditional_lora`（第三方产物 `ostris/ideogram_4_unconditional_lora`，103.9 MB）与表单可选字段「无条件 LoRA 路径」——填了走非对称 CFG 预览，不填走单 DiT CFG；顺带修掉 `text_encoder_tokenizer_path` 被字段白名单误报「未支持」的噪音警告
 - **AI Toolkit 的 Ideogram 4 文本编码器改为 Comfy FP8 单文件（#446 跟进）**：不再要求用户准备 ~16 GB 的 bf16 Qwen3-VL-8B 目录——驱动层把 tokenizer/config 仍指向本地目录、权重改走 Comfy 单文件（上游 mixin 原生支持 `comfy_quant` 单文件加载），资源清单同步改为「TE 单文件 + config/tokenizer 目录（约几 MB）」
 
 - **Windows 启动器 `NextTrainer.exe`（#435）**：放在整合包根目录（与 `启动.bat` 并存）。双击启动等价于 `启动.bat`，但接管进程树：关窗 / `Q` 真正停掉服务，端口占用或启动失败给中文提示，`U` 一键更新（先停服 → 运行更新脚本 → `R` 重启）。C# NativeAOT 编译（约 5 MB，无 .NET 运行时依赖）。构建脚本 `build-scripts/06-build-launcher.ps1`，已接入 2026 全量 / musubi-only / kohya-only / resume 的打包流程

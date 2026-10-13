@@ -266,7 +266,8 @@ def adapt_config(source: dict, runtime: RuntimeConfig, run_id: str, variant: str
             'sample_steps': number(source, 'sample_steps', 20, 1, integer=True), 'neg': str(source.get('negative_prompts') or ''),
         }
     known = {'model_train_type', 'model_input_mode', 'model_path', 'model_config_dir', 'model_variant',
-             'dit_path', 'text_encoder_path', 'vae_path', 'dit', 'text_encoder', 'pretrained_model_name_or_path',
+             'dit_path', 'text_encoder_path', 'text_encoder_tokenizer_path', 'unconditional_lora_path',
+             'vae_path', 'dit', 'text_encoder', 'pretrained_model_name_or_path',
              'train_data_dir', 'training_task', 'control_data_dirs', 'caption_extension', 'caption_dropout_rate',
              'shuffle_caption', 'cache_latents_to_disk', 'resolution', 'dataset_repeats', 'max_train_steps',
              'output_name', 'output_dir', 'logging_dir', 'quantize', 'quantize_te', 'qtype', 'low_vram', 'layer_offloading',

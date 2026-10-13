@@ -429,3 +429,17 @@ def test_engine_config_import_accepts_new_train_types():
     })
     assert ideogram4["result"] == "ok"
     assert ideogram4["config"]["model_input_mode"] == "comfyui_files"
+
+
+def test_comfy_te_and_optional_lora_fields_do_not_warn(tmp_path):
+    """Both AI Toolkit Ideogram 4 extras must pass the adapter without warnings (#446)."""
+    lora = tmp_path / "models" / "uncond_lora.safetensors"
+    lora.parent.mkdir(parents=True, exist_ok=True)
+    lora.write_text("x", encoding="utf-8")
+    adapted = adapt_config(
+        _source(tmp_path, text_encoder_tokenizer_path=str(tmp_path / "models" / "qwen3-4b"),
+                unconditional_lora_path=str(lora)),
+        _runtime(tmp_path), "run-1", "klein-4b",
+    )
+    unsupported = [w for w in adapted.warnings if "未支持此字段" in w]
+    assert unsupported == []
