@@ -137,9 +137,11 @@ def run_preflight(
                     "conversion_cache": None,
                 }
                 warnings.append(
-                    "Ideogram 4 将直接读取 Comfy 单文件组件（条件 DiT + Flux2 VAE），"
+                    "Ideogram 4 将直接读取 Comfy 单文件组件（条件 DiT + Flux2 VAE + Qwen3-VL-8B 文本编码器），"
                     "由引擎驱动在内存中整理 FP8 缩放形状并剔除 comfy_quant 标记，"
-                    f"不写入 diffusers 目录、不产生缓存副本；文本编码器使用本地目录: {assets['text_encoder']}"
+                    "不写入 diffusers 目录、不产生缓存副本；"
+                    f"文本编码器单文件: {assets['text_encoder']}，"
+                    f"tokenizer/config 目录: {assets.get('text_encoder_tokenizer') or '（未配置）'}"
                 )
         except (ValueError, OSError, KeyError, TypeError) as exc:
             errors.append(str(exc))

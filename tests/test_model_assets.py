@@ -87,16 +87,20 @@ class ModelAssetsManifestTests(unittest.TestCase):
 
     def test_ai_toolkit_ideogram4_manifest_reuses_comfy_org_sources(self):
         assets = {asset.key: asset for asset in manifest_for("ai-toolkit-ideogram4-lora")}
-        self.assertEqual(set(assets), {"dit", "vae", "text_encoder"})
+        self.assertEqual(set(assets), {"dit", "vae", "text_encoder", "text_encoder_tokenizer"})
         self.assertEqual(assets["dit"].hf_repo, "Comfy-Org/Ideogram-4")
         self.assertEqual(assets["dit"].hf_file, "diffusion_models/ideogram4_fp8_scaled.safetensors")
         self.assertIn("非商用", assets["dit"].label)
         self.assertEqual(assets["vae"].hf_file, "vae/flux2-vae.safetensors")
         te = assets["text_encoder"]
-        self.assertEqual(te.kind, "dir")
-        self.assertEqual(te.hf_repo, "Qwen/Qwen3-VL-8B-Instruct")
-        self.assertTrue(te.dir_needs_weights)
-        self.assertIn("config.json", te.dir_required)
+        self.assertEqual(te.kind, "file")
+        self.assertEqual(te.hf_repo, "Comfy-Org/Ideogram-4")
+        self.assertEqual(te.hf_file, "text_encoders/qwen3vl_8b_fp8_scaled.safetensors")
+        tokenizer = assets["text_encoder_tokenizer"]
+        self.assertEqual(tokenizer.kind, "dir")
+        self.assertEqual(tokenizer.hf_repo, "Qwen/Qwen3-VL-8B-Instruct")
+        self.assertFalse(tokenizer.dir_needs_weights)
+        self.assertIn("config.json", tokenizer.dir_required)
 
     def test_ai_toolkit_ideogram4_shares_comfy_defaults_with_musubi(self):
         musubi = {asset.key: asset for asset in manifest_for("ideogram4-lora")}
@@ -126,18 +130,26 @@ class ModelAssetsToolkitTrainTypeCheckTests(unittest.TestCase):
             self.assertTrue(items["dit"]["sources"]["huggingface"])
             self.assertTrue(items["dit"]["sources"]["modelscope"])
 
-    def test_ideogram4_text_encoder_dir_requires_weights(self):
+    def test_ideogram4_text_encoder_is_a_comfy_single_file(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            te = root / "sd-models" / "ideogram4" / "qwen3-vl-8b-instruct"
-            te.mkdir(parents=True)
+            te = root / "sd-models" / "ideogram4" / "qwen3vl_8b_fp8_scaled.safetensors"
+            te.parent.mkdir(parents=True)
+            before = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {}, root)}
+            self.assertFalse(before["text_encoder"]["exists"])
+            te.write_text("x", encoding="utf-8")
+            after = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {}, root)}
+            self.assertTrue(after["text_encoder"]["exists"])
+
+    def test_ideogram4_tokenizer_dir_no_longer_needs_weights(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            tokenizer = root / "sd-models" / "ideogram4" / "qwen3-vl-8b-instruct"
+            tokenizer.mkdir(parents=True)
             for name in ("config.json", "tokenizer.json", "tokenizer_config.json"):
-                (te / name).write_text("{}", encoding="utf-8")
-            items = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {"text_encoder": str(te)}, root)}
-            self.assertFalse(items["text_encoder"]["exists"])
-            (te / "model.safetensors").write_text("x", encoding="utf-8")
-            items = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {"text_encoder": str(te)}, root)}
-            self.assertTrue(items["text_encoder"]["exists"])
+                (tokenizer / name).write_text("{}", encoding="utf-8")
+            items = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {}, root)}
+            self.assertTrue(items["text_encoder_tokenizer"]["exists"])
 
 
 class ModelAssetsCheckTests(unittest.TestCase):

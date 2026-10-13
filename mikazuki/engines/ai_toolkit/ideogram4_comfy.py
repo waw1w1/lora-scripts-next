@@ -85,3 +85,53 @@ def comfy_component_state_dict(path, subfolder: str) -> dict:
     if subfolder == "transformer":
         return normalize_dit_state_dict(state_dict)
     return state_dict
+
+
+def comfy_text_encoder_loader(original):
+    """Wrap ``_load_text_encoder`` so a Comfy FP8 single file can feed the model.
+
+    Upstream hands one path to both the tokenizer and the encoder; a Comfy FP8
+    ``.safetensors`` cannot serve as a tokenizer source. Split them when the TE
+    path is a single file: the tokenizer/config keep the local directory (or the
+    hub id), while the weights load through the toolkit's single-file path, which
+    already understands ``comfy_quant`` checkpoints.
+    """
+
+    def load_text_encoder(self, base: str):
+        kwargs = self.model_config.model_kwargs or {}
+        te_path = str(kwargs.get("text_encoder_path") or "")
+        if not te_path.lower().endswith(".safetensors"):
+            return original(self, base)
+        tokenizer_source = str(kwargs.get("text_encoder_tokenizer_path") or "")
+        if not tokenizer_source:
+            raise ValueError(
+                "Ideogram 4 使用 Comfy 单文件文本编码器时缺少 tokenizer/config 目录"
+                "（model_kwargs.text_encoder_tokenizer_path）"
+            )
+
+        import os
+
+        from transformers import AutoTokenizer
+        from toolkit.basic import flush
+        from toolkit.models.v2.text_encoders.qwen3_vl import Qwen3VLModelEncoder
+
+        self.print_and_status_update(
+            f"Loading Qwen3-VL text encoder from Comfy single file {te_path} "
+            f"(tokenizer/config: {tokenizer_source})"
+        )
+        tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_source, token=os.getenv("HF_TOKEN", None)
+        )
+        text_encoder = Qwen3VLModelEncoder.load_model(
+            te_path,
+            dtype=self.torch_dtype,
+            subfolder="",
+            config_path=tokenizer_source,
+            use_comfy_weights=False,
+        )
+        flush()
+        text_encoder.eval()
+        text_encoder.requires_grad_(False)
+        return tokenizer, text_encoder
+
+    return load_text_encoder

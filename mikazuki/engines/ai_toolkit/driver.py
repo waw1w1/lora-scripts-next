@@ -61,7 +61,11 @@ def apply_ideogram4_comfy_inputs(sources: dict) -> None:
     Nothing is written to disk and `base`/`basename` stay untouched for the
     diffusers-directory path.
     """
-    from ideogram4_comfy import comfy_component_state_dict, is_original_vae_state_dict
+    from ideogram4_comfy import (
+        comfy_component_state_dict,
+        comfy_text_encoder_loader,
+        is_original_vae_state_dict,
+    )
 
     from extensions_built_in.diffusion_models.ideogram4 import ideogram4 as ideogram4_ext
 
@@ -81,6 +85,9 @@ def apply_ideogram4_comfy_inputs(sources: dict) -> None:
 
     ideogram4_ext._load_component_state_dict = load_component_state_dict
     ideogram4_ext.convert_diffusers_state_dict = convert_diffusers_state_dict
+    # Comfy FP8 text encoder: tokenizer/config from a directory, weights from the
+    # single file (upstream's one-path-for-both does not accept a file here).
+    ideogram4_ext._load_text_encoder = comfy_text_encoder_loader(ideogram4_ext._load_text_encoder)
 
 
 def apply_local_inputs(model):

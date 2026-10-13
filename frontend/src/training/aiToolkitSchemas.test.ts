@@ -64,17 +64,19 @@ describe("AI Toolkit Ideogram 4 schema", () => {
     expect(model).not.toHaveProperty("training_task")
   })
 
-  it("comfyui_files asks for DiT/VAE/TE and no diffusers config repo", () => {
+  it("comfyui_files asks for DiT/VAE/TE single files plus the tokenizer directory", () => {
     const model = {
       ...createDefaultModel(ideogram4),
       dit_path: "./sd-models/ideogram4/ideogram4_fp8_scaled.safetensors",
       vae_path: "./sd-models/ideogram4/flux2-vae.safetensors",
-      text_encoder_path: "./sd-models/ideogram4/qwen3-vl-8b-instruct",
+      text_encoder_path: "./sd-models/ideogram4/qwen3vl_8b_fp8_scaled.safetensors",
+      text_encoder_tokenizer_path: "./sd-models/ideogram4/qwen3-vl-8b-instruct",
     }
     const config = serializeModel(ideogram4, model)
     expect(config.dit_path).toBe("./sd-models/ideogram4/ideogram4_fp8_scaled.safetensors")
     expect(config.vae_path).toBe("./sd-models/ideogram4/flux2-vae.safetensors")
-    expect(config.text_encoder_path).toBe("./sd-models/ideogram4/qwen3-vl-8b-instruct")
+    expect(config.text_encoder_path).toBe("./sd-models/ideogram4/qwen3vl_8b_fp8_scaled.safetensors")
+    expect(config.text_encoder_tokenizer_path).toBe("./sd-models/ideogram4/qwen3-vl-8b-instruct")
     expect(config).not.toHaveProperty("model_config_dir")
     expect(validateModel(ideogram4, model)).toEqual({})
   })
