@@ -56,6 +56,29 @@ TOKENIZER_REQUIRED = ("tokenizer.json", "tokenizer_config.json")
 
 KLEIN_4B_REPO = "black-forest-labs/FLUX.2-klein-base-4B"
 KLEIN_9B_REPO = "black-forest-labs/FLUX.2-klein-base-9B"
+
+# SD 1.5 single-file training (AI Toolkit arch `sd1`) loads the Comfy/LDM
+# checkpoint through diffusers `from_single_file`; only the pipeline configs and
+# the CLIP tokenizer are needed locally (the offline launch never calls the Hub).
+# ModelScope's AI-ModelScope/stable-diffusion-v1-5 carries the same layout and
+# the same v1-5-pruned-emaonly.safetensors single file.
+SD15_REPO = "stable-diffusion-v1-5/stable-diffusion-v1-5"
+SD15_MS_REPO = "AI-ModelScope/stable-diffusion-v1-5"
+SD15_CKPT_FILE = "v1-5-pruned-emaonly.safetensors"
+SD15_CONFIG_DIR = "sd-models/sd15/config"
+SD15_CONFIG_PATTERNS = ("model_index.json", "unet/*.json", "vae/*.json", "text_encoder/*.json",
+                        "feature_extractor/*.json", "scheduler/*.json", "tokenizer/*")
+SD15_CONFIG_REQUIRED = (
+    "model_index.json", "unet/config.json", "vae/config.json", "text_encoder/config.json",
+    "feature_extractor/preprocessor_config.json", "scheduler/scheduler_config.json",
+    "tokenizer/vocab.json", "tokenizer/tokenizer_config.json",
+)
+
+# AI Toolkit's Ideogram 4 extension loads its text encoder with transformers
+# (upstream default: the bf16 Qwen/Qwen3-VL-8B-Instruct repo); the Comfy-Org
+# FP8 text encoder file used by Musubi is not consumed by this engine.
+IDEOGRAM4_TE_DIR = "sd-models/ideogram4/qwen3-vl-8b-instruct"
+
 # ai-toolkit auto-loads `<name_or_path>/ae.safetensors` when present (flux2_model.py),
 # so the VAE asset lands next to the DiT file under sd-models/klein/.
 # ModelScope mirror (KanKanKan/flux2-vae, flux2-vae.safetensors) verified 2026-08-28
@@ -137,6 +160,35 @@ ASSET_REGISTRY: dict[str, tuple[AssetDef, ...]] = {
                  ms_repo=IDEOGRAM4_REPO, ms_file="vae/flux2-vae.safetensors"),
         AssetDef("tokenizer", "Qwen3-VL-8B tokenizer（目录）", "sd-models/ideogram4/qwen3-vl-8b-tokenizer", kind="dir",
                  hf_repo=IDEOGRAM4_TOKENIZER_REPO, ms_repo=IDEOGRAM4_TOKENIZER_REPO),
+    ),
+    # AI Toolkit SD 1.5: the checkpoint stays a Comfy/LDM single file; only the
+    # diffusers configs + tokenizer are downloaded here, so no weight conversion
+    # and no weight duplication. Both files are public on HF and ModelScope.
+    "ai-toolkit-sd15-lora": (
+        AssetDef("dit", "SD 1.5 底模（Comfy/LDM 单文件，SD 1.5 官方权重）", f"sd-models/sd15/{SD15_CKPT_FILE}",
+                 hf_repo=SD15_REPO, hf_file=SD15_CKPT_FILE,
+                 ms_repo=SD15_MS_REPO, ms_file=SD15_CKPT_FILE),
+        AssetDef("model_config_dir", "SD 1.5 配置与 tokenizer（单文件训练所需，不含权重）", SD15_CONFIG_DIR, kind="dir",
+                 hf_repo=SD15_REPO, ms_repo=SD15_MS_REPO,
+                 dir_patterns=SD15_CONFIG_PATTERNS, dir_required=SD15_CONFIG_REQUIRED),
+    ),
+    # AI Toolkit Ideogram 4: same Comfy-Org single files as the Musubi entry
+    # (conditional DiT + Flux2 VAE, non-commercial license, nothing bundled),
+    # loaded in place by the engine driver; the bf16 Qwen3-VL-8B directory is
+    # what the upstream extension's transformers loader expects.
+    "ai-toolkit-ideogram4-lora": (
+        AssetDef("dit", "Ideogram 4 conditional DiT（FP8 底模，非商用许可，Comfy 单文件）",
+                 "sd-models/ideogram4/ideogram4_fp8_scaled.safetensors",
+                 hf_repo=IDEOGRAM4_REPO, hf_file="diffusion_models/ideogram4_fp8_scaled.safetensors",
+                 ms_repo=IDEOGRAM4_REPO, ms_file="diffusion_models/ideogram4_fp8_scaled.safetensors"),
+        AssetDef("vae", "VAE（Flux2，Comfy 单文件）", "sd-models/ideogram4/flux2-vae.safetensors",
+                 hf_repo=IDEOGRAM4_REPO, hf_file="vae/flux2-vae.safetensors",
+                 ms_repo=IDEOGRAM4_REPO, ms_file="vae/flux2-vae.safetensors"),
+        AssetDef("text_encoder", "文本编码器（Qwen3-VL-8B BF16 目录，AI Toolkit 直读）", IDEOGRAM4_TE_DIR,
+                 kind="dir", hf_repo=IDEOGRAM4_TOKENIZER_REPO, ms_repo=IDEOGRAM4_TOKENIZER_REPO,
+                 dir_patterns=("*.json", "*.safetensors", "*.txt"),
+                 dir_required=("config.json", "tokenizer.json", "tokenizer_config.json"),
+                 dir_needs_weights=True),
     ),
 }
 

@@ -46,7 +46,8 @@ def test_status_reports_not_installed(tmp_path, monkeypatch):
     assert response.data["feature_enabled"] is True
     assert set(response.data["train_types"]) == {
         "klein-4b-lora", "klein-9b-lora", "ai-toolkit-flux-lora",
-        "ai-toolkit-sdxl-lora", "ai-toolkit-qwen-image-21-lora",
+        "ai-toolkit-sdxl-lora", "ai-toolkit-sd15-lora", "ai-toolkit-ideogram4-lora",
+        "ai-toolkit-qwen-image-21-lora",
         "ai-toolkit-krea2-lora", "ai-toolkit-anima-lora",
     }
 

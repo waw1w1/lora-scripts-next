@@ -329,14 +329,31 @@
             if (mode === "model_directory") fields.model_path = path(spec.family === "klein"
                 ? "服务端 DiT 目录 / Local DiT directory（含所选版本的 flux-2-klein-*.safetensors；TE / VAE 另填）"
                 : spec.family === "krea2" ? "服务端 DiT 目录 / Local DiT directory（含 krea2.safetensors；TE / VAE 另填）"
+                : spec.family === "ideogram4" ? "服务端 Ideogram 4 目录 / Local model directory（含 transformer/ 与 vae/ 权重；TE 另填）"
                 : "服务端本地模型目录 / Local model directory（含配置、权重及 tokenizer）")
-            else fields.dit_path = path("底模权重 / Model weights（本地 safetensors；不修改原文件）", false)
-            if ((spec.family === "sdxl" && mode === "single_file") || mode === "comfyui_files") {
+            else fields.dit_path = path(spec.family === "ideogram4"
+                ? "底模权重 / Model weights（Comfy-Org 条件 DiT 单文件；原位读取，不修改原文件）"
+                : "底模权重 / Model weights（本地 safetensors；不修改原文件）", false)
+            if ((spec.family === "sdxl" && mode === "single_file") || (mode === "comfyui_files" && spec.family !== "ideogram4")) {
                 fields.model_config_dir = path("本地组件配置与 tokenizer 仓库 / Local configs and tokenizers（model_index.json 及各组件 config.json）")
             }
-            if (["klein", "krea2"].includes(spec.family) || mode === "comfyui_files") {
+            if (spec.family === "sd15" && mode === "single_file") {
+                // Only pipeline configs + tokenizer live here; the checkpoint stays a
+                // single Comfy/LDM file. Downloadable from the model assets panel.
+                fields.model_config_dir = Schema.string().role('filepicker', { type: "folder" })
+                    .default("./sd-models/sd15/config")
+                    .description("SD 1.5 配置与 tokenizer 目录 / Local configs and tokenizers（model_index.json 及各组件 config.json，不含权重；留空即用「训练用模型」面板下载的默认路径）")
+            }
+            if (["klein", "krea2"].includes(spec.family) || (mode === "comfyui_files" && spec.family !== "ideogram4")) {
                 fields.text_encoder_path = path("文本编码器 / Text encoder（" + (spec.family === "klein" ? "4B 用 Qwen3-4B，9B 用 Qwen3-8B 本地目录" : spec.family === "krea2" ? "Qwen3-VL 本地目录" : "Qwen3-VL-8B BF16 文件") + "）", mode !== "comfyui_files")
                 fields.vae_path = path("VAE（" + (spec.family === "klein" ? "FLUX.2 ae.safetensors 文件" : spec.family === "krea2" ? "Qwen-Image VAE 目录，含配置及权重" : "Qwen-Image-2.1 BF16 文件") + "）", spec.family === "krea2")
+            }
+            if (spec.family === "ideogram4") {
+                // Both modes need the Qwen3-VL text encoder as an explicit local
+                // directory (upstream's transformers loader; the Comfy FP8 file
+                // is not consumed by this engine). Only comfyui_files adds a VAE.
+                fields.text_encoder_path = path("文本编码器 / Text encoder（Qwen3-VL-8B BF16 本地目录，含 config 与 tokenizer）", true)
+                if (mode === "comfyui_files") fields.vae_path = path("VAE（Flux2 单文件，Comfy-Org flux2-vae.safetensors；原位读取）", false)
             }
             return Schema.object(fields)
         })))
@@ -402,7 +419,7 @@
                 enable_preview: Schema.const(true),
                 sample_every_n_steps: integer(250).description("每 N 步预览 / Sample every N steps"),
                 sample_at_first: Schema.boolean().default(false).description("训练前先预览 / Sample before training"),
-                ...(spec.family === "sdxl" ? { negative_prompts: Schema.string().role("textarea").description("反向提示词 / Negative prompt") } : {}),
+                ...(["sdxl", "sd15"].includes(spec.family) ? { negative_prompts: Schema.string().role("textarea").description("反向提示词 / Negative prompt") } : {}),
                 preview_samples: Schema.array(String).role('preview-samples', { dimensionStep: spec.sample_multiple || 16, minGuidance: 0 }).default(['{"prompt":"a photo","width":1024,"height":1024,"seed":42,"guidance_scale":4,"sample_steps":20,"controlImages":[]}']).description("预览样例 / Samples（宽高为 " + (spec.sample_multiple || 16) + " 的倍数；编辑预览每组 1–3 张参考图）"),
             }),
             Schema.object({ enable_preview: Schema.const(false) }),

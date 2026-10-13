@@ -216,7 +216,7 @@ def adapt_config(source: dict, runtime: RuntimeConfig, run_id: str, variant: str
     quantize = boolean(source, 'quantize', spec.get('quantization', True))
     quantize_te = boolean(source, 'quantize_te', quantize)
     if spec.get('quantization') is False and (quantize or quantize_te):
-        raise AdapterError('SDXL 首版不支持量化')
+        raise AdapterError(f'{spec["label"]} 首版不支持量化')
     qtype = choice(source, 'qtype', ['qfloat8', 'qint8', 'qint4'], 'qfloat8')
     model.update(quantize=quantize, quantize_te=quantize_te, qtype=qtype, qtype_te=qtype,
                  low_vram=boolean(source, 'low_vram'), layer_offloading=boolean(source, 'layer_offloading'))
@@ -256,7 +256,7 @@ def adapt_config(source: dict, runtime: RuntimeConfig, run_id: str, variant: str
     if preview:
         samples = _samples(source, runtime, task == 'image-edit', spec.get('sample_multiple', 16))
         process['sample'] = {
-            'sampler': 'ddpm' if family(variant) == 'sdxl' else 'flowmatch',
+            'sampler': 'ddpm' if family(variant) in {'sdxl', 'sd15'} else 'flowmatch',
             'sample_every': number(source, 'sample_every_n_steps', 250, 1, integer=True),
             'samples': samples, 'prompts': [s['prompt'] for s in samples],
             'width': number(source, 'sample_width', 1024, 64, integer=True),

@@ -304,3 +304,128 @@ def test_dump_yaml_roundtrip(tmp_path):
     assert "variant" not in _process(adapted)["model"]
     assert loaded["meta"]["next_trainer"]["assets"]["variant"] == "klein-4b"
     assert "flux2_klein_4b" in text
+
+
+def _sd15_source(tmp_path: Path, **overrides) -> dict:
+    data = tmp_path / "train" / "sd15"
+    data.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(data / "img.png")
+    checkpoint = tmp_path / "models" / "v1-5-pruned-emaonly.safetensors"
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    _weights(checkpoint)
+    base = {
+        "model_input_mode": "single_file",
+        "dit_path": str(checkpoint),
+        "model_config_dir": str(tmp_path / "sd-models" / "sd15" / "config"),
+        "train_data_dir": str(data),
+        "max_train_steps": 2000,
+        "learning_rate": "1e-4",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_sd15_single_file_mapping(tmp_path):
+    adapted = adapt_config(_sd15_source(tmp_path), _runtime(tmp_path), "run-1", "sd15")
+    model = _process(adapted)["model"]
+    assert model["arch"] == "sd1"
+    assert Path(model["name_or_path"]) == tmp_path / "models" / "v1-5-pruned-emaonly.safetensors"
+    assert Path(model["model_kwargs"]["next_trainer_sd15_config"]) == tmp_path / "sd-models" / "sd15" / "config"
+    assert model["quantize"] is False
+    assert _process(adapted)["train"]["noise_scheduler"] == "ddpm"
+    assert "sampler" not in adapted.config["config"]["process"][0]  # previews stay off
+    assert adapted.warnings == []
+
+
+def test_sd15_preview_uses_ddpm_sampler(tmp_path):
+    source = _sd15_source(tmp_path, enable_preview=True, positive_prompts="a cat", negative_prompts="blurry")
+    adapted = adapt_config(source, _runtime(tmp_path), "run-1", "sd15")
+    sample = adapted.config["config"]["process"][0]["sample"]
+    assert sample["sampler"] == "ddpm"
+    assert sample["neg"] == "blurry"
+
+
+def test_sd15_rejects_quantization(tmp_path):
+    with pytest.raises(AdapterError, match="不支持量化"):
+        adapt_config(_sd15_source(tmp_path, quantize=True), _runtime(tmp_path), "run-1", "sd15")
+
+
+def _ideogram4_source(tmp_path: Path, **overrides) -> dict:
+    data = tmp_path / "train" / "ideogram4"
+    data.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (8, 8)).save(data / "img.png")
+    models = tmp_path / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    dit = models / "ideogram4_fp8_scaled.safetensors"
+    vae = models / "flux2-vae.safetensors"
+    for path in (dit, vae):
+        _weights(path)
+    te = models / "qwen3-vl-8b-instruct"
+    base = {
+        "model_input_mode": "comfyui_files",
+        "dit_path": str(dit),
+        "vae_path": str(vae),
+        "text_encoder_path": str(te),
+        "train_data_dir": str(data),
+        "max_train_steps": 2000,
+        "learning_rate": "1e-4",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_ideogram4_comfyui_files_mapping(tmp_path):
+    adapted = adapt_config(_ideogram4_source(tmp_path), _runtime(tmp_path), "run-1", "ideogram4")
+    model = _process(adapted)["model"]
+    assert model["arch"] == "ideogram4"
+    assert model["name_or_path"].endswith("ideogram4_fp8_scaled.safetensors")
+    assert model["model_kwargs"]["next_trainer_comfy_components"]["vae"].endswith("flux2-vae.safetensors")
+    assets = adapted.config["meta"]["next_trainer"]["assets"]
+    assert assets["mode"] == "comfyui_files"
+    assert Path(adapted.te_path) == tmp_path / "models" / "qwen3-vl-8b-instruct"
+    assert adapted.warnings == []
+
+
+def test_ideogram4_model_directory_mapping(tmp_path):
+    model_dir = tmp_path / "models" / "ideogram4-diffusers"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    source = _ideogram4_source(tmp_path)
+    source.update({
+        "model_input_mode": "model_directory",
+        "model_path": str(model_dir),
+    })
+    source.pop("dit_path")
+    adapted = adapt_config(source, _runtime(tmp_path), "run-1", "ideogram4")
+    model = _process(adapted)["model"]
+    assert model["name_or_path"] == str(model_dir)
+    assert "next_trainer_comfy_components" not in model["model_kwargs"]
+    assert adapted.config["meta"]["next_trainer"]["assets"]["text_encoder"].endswith("qwen3-vl-8b-instruct")
+
+
+def test_ideogram4_requires_text_encoder(tmp_path):
+    with pytest.raises(AdapterError, match="模型路径不能为空"):
+        adapt_config(_ideogram4_source(tmp_path, text_encoder_path=None, text_encoder=""), _runtime(tmp_path), "run-1", "ideogram4")
+
+
+def test_engine_config_import_accepts_new_train_types():
+    from mikazuki.engines.ai_toolkit.config_import import validate_import
+
+    sd15 = validate_import("ai-toolkit-sd15-lora", {
+        "model_train_type": "ai-toolkit-sd15-lora",
+        "model_input_mode": "single_file",
+        "dit_path": "./sd-models/sd15/v1-5-pruned-emaonly.safetensors",
+        "model_config_dir": "./sd-models/sd15/config",
+        "negative_prompts": "blurry",
+    })
+    assert sd15["result"] == "ok"
+    assert "negative_prompts" not in sd15.get("notice", "")
+
+    ideogram4 = validate_import("ai-toolkit-ideogram4-lora", {
+        "model_train_type": "ai-toolkit-ideogram4-lora",
+        "model_input_mode": "comfyui_files",
+        "dit_path": "./sd-models/ideogram4/ideogram4_fp8_scaled.safetensors",
+        "vae_path": "./sd-models/ideogram4/flux2-vae.safetensors",
+        "text_encoder_path": "./sd-models/ideogram4/qwen3-vl-8b-instruct",
+    })
+    assert ideogram4["result"] == "ok"
+    assert ideogram4["config"]["model_input_mode"] == "comfyui_files"

@@ -93,6 +93,8 @@ describe("training module mapping", () => {
     const schemas: Record<string, string> = {
       klein: "klein-lora",
       sdxl: "ai-toolkit-sdxl-lora",
+      sd15: "ai-toolkit-sd15-lora",
+      ideogram4: "ai-toolkit-ideogram4-lora",
       flux: "ai-toolkit-flux-lora",
       krea2: "ai-toolkit-krea2-lora",
       anima: "ai-toolkit-anima-lora",

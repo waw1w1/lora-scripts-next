@@ -68,9 +68,9 @@ def validate_import(page, source):
     if config.get('control_data_dirs') and not config.get('training_task'):
         config['training_task'] = 'image-edit'
     unsupported = set(config) - UI_FIELDS - LEGACY_FIELDS
-    if variant == 'sdxl':
+    if variant in {'sdxl', 'sd15'}:
         unsupported.update(key for key in ('quantize', 'quantize_te', 'qtype', 'low_vram', 'layer_offloading') if config.get(key))
-    if variant != 'sdxl' and config.get('negative_prompts'):
+    if variant not in {'sdxl', 'sd15'} and config.get('negative_prompts'):
         unsupported.add('negative_prompts')
     if not MODELS[variant].get('editing') and (config.get('control_data_dirs') or config.get('training_task') == 'image-edit'):
         return {'result': 'reject', 'errors': [f"{MODELS[variant]['label']} 首版只支持文生图"]}

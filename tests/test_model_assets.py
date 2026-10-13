@@ -69,6 +69,76 @@ class ModelAssetsManifestTests(unittest.TestCase):
         self.assertEqual(resolve_train_type("lora-master", {"model_train_type": "krea2-lora"}), "krea2-lora")
         self.assertEqual(resolve_train_type("krea2-lora", {}), "krea2-lora")
 
+    def test_ai_toolkit_sd15_manifest_keeps_comfy_single_file(self):
+        assets = {asset.key: asset for asset in manifest_for("ai-toolkit-sd15-lora")}
+        self.assertEqual(set(assets), {"dit", "model_config_dir"})
+        dit = assets["dit"]
+        self.assertEqual(dit.hf_file, "v1-5-pruned-emaonly.safetensors")
+        self.assertEqual(dit.ms_repo, "AI-ModelScope/stable-diffusion-v1-5")
+        self.assertEqual(dit.default_path, "sd-models/sd15/v1-5-pruned-emaonly.safetensors")
+        config = assets["model_config_dir"]
+        self.assertEqual(config.kind, "dir")
+        self.assertFalse(config.dir_needs_weights)
+        self.assertIn("model_index.json", config.dir_required)
+        self.assertIn("feature_extractor/preprocessor_config.json", config.dir_required)
+        self.assertIn("tokenizer/vocab.json", config.dir_required)
+        # The form default in model_inputs/shared.ts must match the asset path.
+        self.assertEqual(config.default_path, "sd-models/sd15/config")
+
+    def test_ai_toolkit_ideogram4_manifest_reuses_comfy_org_sources(self):
+        assets = {asset.key: asset for asset in manifest_for("ai-toolkit-ideogram4-lora")}
+        self.assertEqual(set(assets), {"dit", "vae", "text_encoder"})
+        self.assertEqual(assets["dit"].hf_repo, "Comfy-Org/Ideogram-4")
+        self.assertEqual(assets["dit"].hf_file, "diffusion_models/ideogram4_fp8_scaled.safetensors")
+        self.assertIn("非商用", assets["dit"].label)
+        self.assertEqual(assets["vae"].hf_file, "vae/flux2-vae.safetensors")
+        te = assets["text_encoder"]
+        self.assertEqual(te.kind, "dir")
+        self.assertEqual(te.hf_repo, "Qwen/Qwen3-VL-8B-Instruct")
+        self.assertTrue(te.dir_needs_weights)
+        self.assertIn("config.json", te.dir_required)
+
+    def test_ai_toolkit_ideogram4_shares_comfy_defaults_with_musubi(self):
+        musubi = {asset.key: asset for asset in manifest_for("ideogram4-lora")}
+        ai_toolkit = {asset.key: asset for asset in manifest_for("ai-toolkit-ideogram4-lora")}
+        self.assertEqual(ai_toolkit["dit"].default_path, musubi["dit"].default_path)
+        self.assertEqual(ai_toolkit["vae"].default_path, musubi["vae"].default_path)
+        self.assertEqual(ai_toolkit["dit"].hf_repo, musubi["dit"].hf_repo)
+        self.assertEqual(ai_toolkit["vae"].hf_repo, musubi["vae"].hf_repo)
+
+
+class ModelAssetsToolkitTrainTypeCheckTests(unittest.TestCase):
+    def test_sd15_config_dir_completeness_and_defaults(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config = root / "sd-models" / "sd15" / "config"
+            for name in ("model_index.json", "unet/config.json", "vae/config.json",
+                         "text_encoder/config.json", "feature_extractor/preprocessor_config.json",
+                         "scheduler/scheduler_config.json",
+                         "tokenizer/vocab.json", "tokenizer/tokenizer_config.json"):
+                path = config / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("{}", encoding="utf-8")
+            items = {item["key"]: item for item in check_assets("ai-toolkit-sd15-lora", {}, root)}
+            self.assertTrue(items["model_config_dir"]["exists"])
+            self.assertEqual(items["model_config_dir"]["path"], str(config.resolve()))
+            self.assertFalse(items["dit"]["exists"])
+            self.assertTrue(items["dit"]["sources"]["huggingface"])
+            self.assertTrue(items["dit"]["sources"]["modelscope"])
+
+    def test_ideogram4_text_encoder_dir_requires_weights(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            te = root / "sd-models" / "ideogram4" / "qwen3-vl-8b-instruct"
+            te.mkdir(parents=True)
+            for name in ("config.json", "tokenizer.json", "tokenizer_config.json"):
+                (te / name).write_text("{}", encoding="utf-8")
+            items = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {"text_encoder": str(te)}, root)}
+            self.assertFalse(items["text_encoder"]["exists"])
+            (te / "model.safetensors").write_text("x", encoding="utf-8")
+            items = {item["key"]: item for item in check_assets("ai-toolkit-ideogram4-lora", {"text_encoder": str(te)}, root)}
+            self.assertTrue(items["text_encoder"]["exists"])
+
 
 class ModelAssetsCheckTests(unittest.TestCase):
     def test_check_reports_missing_and_existing(self):

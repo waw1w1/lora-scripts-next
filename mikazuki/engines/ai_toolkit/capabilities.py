@@ -4,6 +4,13 @@ MODELS = {
     "sdxl": {"label": "SDXL", "arch": "sdxl", "modes": ["model_directory", "single_file"],
              "components": ["unet", "text_encoder", "text_encoder_2", "vae"],
              "tokenizers": ["tokenizer", "tokenizer_2"], "scheduler": "ddpm", "quantization": False},
+    # SD 1.5 loads Comfy/LDM single-file checkpoints (model.diffusion_model.* /
+    # cond_stage_model.* / first_stage_model.*) through diffusers
+    # from_single_file; a local diffusers config dir (configs + tokenizer only)
+    # is bound in driver.py so the offline launch never touches the Hub.
+    "sd15": {"label": "SD 1.5", "arch": "sd1", "modes": ["model_directory", "single_file"],
+             "components": ["unet", "text_encoder", "vae"], "tokenizers": ["tokenizer"],
+             "scheduler": "ddpm", "quantization": False},
     "flux": {"label": "Flux.1 Dev", "arch": "flux", "modes": ["model_directory"],
              "components": ["transformer", "text_encoder", "text_encoder_2", "vae"],
              "tokenizers": ["tokenizer", "tokenizer_2"]},
@@ -21,6 +28,16 @@ MODELS = {
               "sample_multiple": 32,
               "components": ["transformer", "text_encoder", "text_conditioner", "vae"],
               "tokenizers": ["tokenizer", "t5_tokenizer"]},
+    # Ideogram 4 upstream only reads a diffusers-style directory
+    # (<base>/transformer/diffusion_pytorch_model*.safetensors and
+    # <base>/vae/diffusion_pytorch_model.safetensors); the Comfy-Org
+    # single-file layout is served by the pack-side loader in driver.py, so it
+    # is listed first as the default input. Weights are FP8-only and carry the
+    # Ideogram non-commercial license.
+    "ideogram4": {"label": "Ideogram 4", "arch": "ideogram4",
+                  "modes": ["comfyui_files", "model_directory"], "dit_filename": "diffusion_pytorch_model.safetensors",
+                  "sample_multiple": 32,
+                  "components": ["transformer", "text_encoder", "vae"], "tokenizers": ["tokenizer"]},
     "qwen-image-21": {"label": "Qwen Image 2.1", "arch": "qwen_image_2",
                       "sample_multiple": 32,
                       "modes": ["model_directory", "comfyui_files"], "editing": True,

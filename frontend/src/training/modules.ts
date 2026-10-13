@@ -45,6 +45,8 @@ export const TRAINING_MODULES: readonly TrainingModule[] = [
   { model: "ideogram4", engine: "musubi", target: "lora", schemaName: "ideogram4-lora" },
   { model: "klein", engine: "ai-toolkit", target: "lora", schemaName: "klein-lora" },
   { model: "sdxl", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-sdxl-lora" },
+  { model: "sd15", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-sd15-lora" },
+  { model: "ideogram4", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-ideogram4-lora" },
   { model: "flux", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-flux-lora" },
   { model: "anima", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-anima-lora" },
   { model: "krea2", engine: "ai-toolkit", target: "lora", schemaName: "ai-toolkit-krea2-lora" },
@@ -54,6 +56,8 @@ export const TRAINING_MODULES: readonly TrainingModule[] = [
 
 export const SCHEMA_META: Record<string, { titleKey: string; areaKey: string }> = {
   "ai-toolkit-sdxl-lora": { titleKey: "training.schemas.ai-toolkit-sdxl-lora.title", areaKey: "training.schemas.ai-toolkit-sdxl-lora.area" },
+  "ai-toolkit-sd15-lora": { titleKey: "training.schemas.ai-toolkit-sd15-lora.title", areaKey: "training.schemas.ai-toolkit-sd15-lora.area" },
+  "ai-toolkit-ideogram4-lora": { titleKey: "training.schemas.ai-toolkit-ideogram4-lora.title", areaKey: "training.schemas.ai-toolkit-ideogram4-lora.area" },
   "ai-toolkit-flux-lora": { titleKey: "training.schemas.ai-toolkit-flux-lora.title", areaKey: "training.schemas.ai-toolkit-flux-lora.area" },
   "ai-toolkit-anima-lora": { titleKey: "training.schemas.ai-toolkit-anima-lora.title", areaKey: "training.schemas.ai-toolkit-anima-lora.area" },
   "ai-toolkit-krea2-lora": { titleKey: "training.schemas.ai-toolkit-krea2-lora.title", areaKey: "training.schemas.ai-toolkit-krea2-lora.area" },
