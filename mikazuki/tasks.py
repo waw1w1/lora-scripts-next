@@ -75,6 +75,8 @@ class Task:
         self.lane = lane
         self.group = group
         self.returncode = None
+        # No ``process`` attribute until execute() spawns it: its absence (or
+        # None) is how callers tell "never started" from "running" (#446 run).
         self.log_file = self.metadata.get("log_file")
         self._stdout_thread = None
 
@@ -538,7 +540,7 @@ class TaskManager:
         counter lives on the task itself so one flaky task cannot loop
         forever.
         """
-        if rc == 0 or task.status != TaskStatus.FAILED or task.process is None:
+        if rc == 0 or task.status != TaskStatus.FAILED or getattr(task, "process", None) is None:
             return
         if task.lane != LANE_COMPUTE or not task.command:
             return
@@ -595,7 +597,7 @@ class TaskManager:
         if task is None:
             return
         if task.status in (TaskStatus.CREATED, TaskStatus.QUEUED) \
-                and not hasattr(task, "process"):
+                and getattr(task, "process", None) is None:
             # Still waiting in the queue: drop it without touching any process.
             task.status = TaskStatus.TERMINATED
             task.metadata.setdefault("finished_at", datetime.now().timestamp())
@@ -747,10 +749,35 @@ class TaskManager:
         log.info(f"Task {task_id} re-queued ({len(new_tasks)} task(s)) / 任务已重新排队")
         return new_tasks
 
-    def wait_for_process(self, task_id: str):
-        if task_id in self.tasks:
-            task: Task = self.tasks[task_id]
-            task.wait()
+    def wait_for_process(self, task_id: str) -> None:
+        """Block until the task's child process has exited.
+
+        Tasks that are still CREATED/QUEUED have no process yet; wait for the
+        compute worker to start them instead of touching a missing attribute.
+        Unknown ids and already-terminated tasks return immediately. Status
+        bookkeeping stays with the worker — this only awaits the process.
+        """
+        while True:
+            with self._cond:
+                task = self.tasks.get(task_id)
+                if task is None or task.status in (
+                        TaskStatus.FINISHED, TaskStatus.TERMINATED, TaskStatus.FAILED):
+                    return
+                if getattr(task, "process", None) is not None:
+                    process = task.process
+                    break
+                self._cond.wait(timeout=0.2)
+        process.wait()
+        # The worker flips the status right after the process exits (and may
+        # re-queue a failed task); wait for a terminal state so callers
+        # observe the recorded outcome, not a transient RUNNING.
+        while True:
+            with self._cond:
+                task = self.tasks.get(task_id)
+                if task is None or task.status in (
+                        TaskStatus.FINISHED, TaskStatus.TERMINATED, TaskStatus.FAILED):
+                    return
+                self._cond.wait(timeout=0.2)
 
     def queue_position(self, task_id: str) -> Optional[int]:
         with self._cond:

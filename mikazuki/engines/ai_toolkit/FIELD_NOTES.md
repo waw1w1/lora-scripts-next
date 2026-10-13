@@ -8,6 +8,8 @@
 | --- | --- | --- | --- | --- |
 | 2026-08-28 | 5497a001cb8752c665f93907a0393fc612116fd5 | klein-4b | GB10 (aarch64, cu130) | **真机三跑全通**：10 步实跑出 LoRA + step0/10 预览图；TB event 实产（tags=`loss`/`lr`）；metrics/previews/stdout 进度三通道实证 |
 | 2026-08-28 | 5497a001cb8752c665f93907a0393fc612116fd5 | klein-9b | GB10 (aarch64, cu130) | 仅静态：adapter/preflight/routes 单测 + dry-run 出 yaml。**未跑真机训练**（待 GPU 窗口） |
+| 2026-10-13 | ecee894ed2b1f3716d9d7326693061ec1a3105bb | 安装（Windows） | Win11 / RTX 4090 (cu128) | **首次 Windows 实装**：`install_environment` 654 s，audit 一次全绿（errors/warnings 空、state=ready）；uv + CPython 3.11.14 + torch 2.11.0+cu128 + bitsandbytes 0.50.2；占用 5.5 GB（extensions/ai_toolkit）|
+| 2026-10-13 | ecee894ed2b1f3716d9d7326693061ec1a3105bb | sd15 | Win11 / RTX 4090 (cu128) | **真机两跑全通**：`single_file` 直读 SMB UNC 单文件（2.13 GB anything-v5 系 LDM，不转换、不复制）100 步 LoRA——370 s 总耗时（100 步本体 2:17 / 1.37 it/s），产物 13.65 MB / 576 张量（`ss_base_model_version=sd_1.5`）+ step50 存档；10 步预览采样出 step0/step10 两张 512² 实图；产物回读 diffusers 384 张量全匹配、零告警 |
 
 ## 踩坑流水
 
@@ -16,6 +18,7 @@
 - `run.py` 以 `os.getcwd()` 为 import root → launch 必须 cwd=toolkit_root（launcher 已处理，PYTHONPATH 同步镜像）。
 - `get_model.py` 会遍历 `extensions/` 与 `extensions_built_in/`——源码快照必须保留空的 `extensions/` 目录（installer 已兜底创建）。
 - torch 不在上游 requirements 里，安装时须先从 CUDA index 装 torch/torchvision 再装 requirements（environment.install_environment 两段式）。
+- **2026-10-13 Windows 实跑命中**：`train_data_dir` 要指向 `N_概念` 目录的**父目录**——`N_` 重复前缀按 kohya 约定只对子目录生效，直接选中 `10_smoke` 本身会静默按 repeats=1 训练（前端数据集选择器返回的是数据集根目录，手动填路径时注意；上游日志里的 `Found N images` 是 图数×重复 的乘积，可据此回查）。
 - **2026-08-28 GB10 实装命中**：`dgx_requirements.txt` 经 `-r` 嵌套钉的 `torchcodec==0.9.1` 无 linux aarch64 wheel，安装器递归剥离该 pin（`prepare_requirements`）；torchcodec 仅视频/manager 用，Klein 图像路径不 import。已提炼为 KNOWN_PITFALLS P5。
 - **2026-08-28 UI 命中**：schema 初版 DiT 字段用 `pretrained_model_name_or_path`，与 kohya 撞名，SDXL 配置被 carry-over 进 Klein 页。改为引擎专属键 `dit`（照 krea2 先例）+ `dit` 进 `CROSS_SCHEMA_DENY_KEYS`。已提炼为 KNOWN_PITFALLS P6。
 - **2026-08-28 资产下载**：HF `black-forest-labs/FLUX.2-klein-base-{4B,9B}` **未 gate**，根目录有单文件 DiT；ModelScope 有同名镜像同文件——DiT 资产双源可下。VAE 用上游约定：`<name_or_path>/ae.safetensors` 存在即本地消费（flux2_model.py），故 VAE 资产落 `sd-models/klein/ae.safetensors` 与 DiT 同目录；`ai-toolkit/flux2_vae` 官方仓无 ModelScope 镜像，但社区镜像 `KanKanKan/flux2-vae`（flux2-vae.safetensors）已验证为 ae 单文件键布局（Range 拉 header 确认 `decoder.up.0.block.0.conv1.bias`），MS 源已配上（2026-08-28）。另纠正：VAE 有本地覆盖键 `model.vae_path`（ModelConfig），此前调研漏看；目前用同目录约定即可，未接 schema。**VAE 登记为必需资产**（2026-08-28：xet 401 实证运行时自动拉取不可靠，必须先本地就位）。**TE 已本地化（2026-08-28 晚）**：`pack driver.py` 在 venv 内先于上游 main 执行，按 `AI_TOOLKIT_TE_PATH` 环境变量设置 Klein 模型类属性 `flux2_klein_te_path`（engines 补丁 applier 未实现，driver 注入是临时桥；摘除条件：补丁机制落地或上游给 config 键）。TE 资产已登记（Qwen/Qwen3-4B·8B，HF+MS 同 id，kind=dir 带 weights 校验），preflight 对 TE 目录做硬校验（config/tokenizer/权重三件套），schema 加 `text_encoder` 字段并进 `CROSS_SCHEMA_DENY_KEYS`（防 krea2 的 Qwen3-VL 路径串进来）。
@@ -27,8 +30,9 @@
 
 ## 冒烟清单（GPU 窗口时执行）
 
-1. 安装：`POST /api/engines/ai-toolkit/install {"dry_run": false}` → state=ready、audit 全绿。（GB10 已过）
+1. 安装：`POST /api/engines/ai-toolkit/install {"dry_run": false}` → state=ready、audit 全绿。（GB10 / Windows 均已过）
 2. klein-4b-lora：小数据集（~10 张）+ max_train_steps=20 + 采样预览开 → 出 LoRA safetensors + 预览图。（已过，见验证矩阵）
+3. sd15-lora：`single_file` 单文件（含 SMB UNC）+ 100 步 → LoRA + step50 存档；预览采样出实图；产物回读无告警。（已过，见验证矩阵）
 3. klein-9b-lora：同上（量化默认开）。（未跑）
 4. 编辑数据集：train_data_dir + control_data_dirs[] 同名配对 → 训练正常消费 control 图。（未跑）
 5. ~~记录 stdout 日志样例 → 回填进度解析~~（已完成，见观测面实证条）

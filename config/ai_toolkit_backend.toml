@@ -1,13 +1,10 @@
+# ai-toolkit 引擎包配置。
+# 上游固定版本在 mikazuki/engines/ai_toolkit/manifest.py 的 UPSTREAM["commit"]（安装请求里的
+# source_commit 可覆盖）；开发用外部源码树时设 AI_TOOLKIT_ROOT / AI_TOOLKIT_PYTHON 环境变量。
 [backend]
-extension_root = "extensions/ai_toolkit"
 source_dir = "extensions/ai_toolkit/source"
 venv_python = "extensions/ai_toolkit/.venv/Scripts/python.exe"
-external_root = "../ai-toolkit"
-external_python = "../ai-toolkit/.venv/Scripts/python.exe"
-source_commit = "5497a001cb8752c665f93907a0393fc612116fd5"
 cuda_extra = "cu128"
-preflight_level = "full"
-allow_unsupported = false
 
 [paths]
 output_dir = "output/ai-toolkit"
