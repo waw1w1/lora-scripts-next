@@ -66,6 +66,18 @@ def model_inputs(source, root, variant):
         te = str(absolute(source.get("text_encoder_path") or source.get("text_encoder"), root))
         model["model_kwargs"]["text_encoder_path"] = te
         assets["text_encoder"] = te
+        tokenizer_source = str(source.get("text_encoder_tokenizer_path") or "").strip()
+        if tokenizer_source and te.lower().endswith(".safetensors"):
+            # Comfy FP8 TE file: the tokenizer/config still come from a directory
+            # (or a hub id, which is kept verbatim).
+            candidate = Path(tokenizer_source)
+            resolved = str(candidate if candidate.is_absolute() else root / candidate)
+            if Path(resolved).is_dir():
+                model["model_kwargs"]["text_encoder_tokenizer_path"] = resolved
+                assets["text_encoder_tokenizer"] = resolved
+            else:
+                model["model_kwargs"]["text_encoder_tokenizer_path"] = tokenizer_source
+                assets["text_encoder_tokenizer"] = tokenizer_source
         if mode == "comfyui_files":  # Comfy-Org components, loaded in place by driver.py
             components = {"transformer": str(path), "vae": str(absolute(source.get("vae_path"), root))}
             model["model_kwargs"]["next_trainer_comfy_components"] = components
@@ -119,7 +131,19 @@ def validate_assets(assets):
     spec = MODELS[assets["variant"]]
     kind = assets["family"]
     if kind == "ideogram4":
-        _qwen3_vl_dir(Path(assets["text_encoder"]))
+        te_path = Path(assets["text_encoder"])
+        if te_path.suffix.lower() == ".safetensors":
+            # Comfy FP8 single file for the weights; tokenizer/config live in a
+            # local directory (hub ids are accepted as-is by transformers).
+            safetensors_header(te_path)
+            tokenizer_source = str(assets.get("text_encoder_tokenizer") or "")
+            tokenizer_dir = Path(tokenizer_source)
+            if tokenizer_source and tokenizer_dir.is_dir():
+                _config(tokenizer_dir / "config.json")
+                _config(tokenizer_dir / "tokenizer_config.json")
+                _config(tokenizer_dir / "tokenizer.json")
+        else:
+            _qwen3_vl_dir(te_path)
         if assets["mode"] == "comfyui_files":
             dit = Path(assets["components"]["transformer"])
             header = safetensors_header(dit)

@@ -349,11 +349,16 @@
                 fields.vae_path = path("VAE（" + (spec.family === "klein" ? "FLUX.2 ae.safetensors 文件" : spec.family === "krea2" ? "Qwen-Image VAE 目录，含配置及权重" : "Qwen-Image-2.1 BF16 文件") + "）", spec.family === "krea2")
             }
             if (spec.family === "ideogram4") {
-                // Both modes need the Qwen3-VL text encoder as an explicit local
-                // directory (upstream's transformers loader; the Comfy FP8 file
-                // is not consumed by this engine). Only comfyui_files adds a VAE.
-                fields.text_encoder_path = path("文本编码器 / Text encoder（Qwen3-VL-8B BF16 本地目录，含 config 与 tokenizer）", true)
-                if (mode === "comfyui_files") fields.vae_path = path("VAE（Flux2 单文件，Comfy-Org flux2-vae.safetensors；原位读取）", false)
+                if (mode === "comfyui_files") {
+                    // Comfy-Org single files, read in place by the pack driver. The FP8
+                    // text encoder file carries the weights; tokenizer/config still come
+                    // from a local directory (upstream's tokenizer loader needs one).
+                    fields.text_encoder_path = path("文本编码器 / Text encoder（Qwen3-VL-8B FP8 单文件，Comfy-Org qwen3vl_8b_fp8_scaled.safetensors；原位读取）", false)
+                    fields.text_encoder_tokenizer_path = path("Qwen3-VL-8B config/tokenizer 目录（供上面的单文件加载）", true)
+                    fields.vae_path = path("VAE（Flux2 单文件，Comfy-Org flux2-vae.safetensors；原位读取）", false)
+                } else {
+                    fields.text_encoder_path = path("文本编码器 / Text encoder（Qwen3-VL-8B 本地目录，含 config、tokenizer 与权重）", true)
+                }
             }
             return Schema.object(fields)
         })))

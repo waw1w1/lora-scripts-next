@@ -184,11 +184,14 @@ ASSET_REGISTRY: dict[str, tuple[AssetDef, ...]] = {
         AssetDef("vae", "VAE（Flux2，Comfy 单文件）", "sd-models/ideogram4/flux2-vae.safetensors",
                  hf_repo=IDEOGRAM4_REPO, hf_file="vae/flux2-vae.safetensors",
                  ms_repo=IDEOGRAM4_REPO, ms_file="vae/flux2-vae.safetensors"),
-        AssetDef("text_encoder", "文本编码器（Qwen3-VL-8B BF16 目录，AI Toolkit 直读）", IDEOGRAM4_TE_DIR,
+        AssetDef("text_encoder", "文本编码器（Qwen3-VL-8B FP8，Comfy 单文件）",
+                 "sd-models/ideogram4/qwen3vl_8b_fp8_scaled.safetensors",
+                 hf_repo=IDEOGRAM4_REPO, hf_file="text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
+                 ms_repo=IDEOGRAM4_REPO, ms_file="text_encoders/qwen3vl_8b_fp8_scaled.safetensors"),
+        AssetDef("text_encoder_tokenizer", "Qwen3-VL-8B config/tokenizer（目录，供 Comfy 单文件加载）", IDEOGRAM4_TE_DIR,
                  kind="dir", hf_repo=IDEOGRAM4_TOKENIZER_REPO, ms_repo=IDEOGRAM4_TOKENIZER_REPO,
-                 dir_patterns=("*.json", "*.safetensors", "*.txt"),
-                 dir_required=("config.json", "tokenizer.json", "tokenizer_config.json"),
-                 dir_needs_weights=True),
+                 dir_patterns=("*.json", "*.txt", "*.jinja"),
+                 dir_required=("config.json", "tokenizer.json", "tokenizer_config.json")),
     ),
 }
 

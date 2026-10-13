@@ -125,8 +125,13 @@ def _fake_extension(monkeypatch, calls: dict):
     def original_convert(state_dict):
         return {**state_dict, "converted": True}
 
+    def original_text_encoder(self, base):
+        calls["text_encoder"] = base
+        return "original-te"
+
     module._load_component_state_dict = original_loader
     module.convert_diffusers_state_dict = original_convert
+    module._load_text_encoder = original_text_encoder
     package.ideogram4 = module
     monkeypatch.setitem(sys.modules, "extensions_built_in", types.ModuleType("extensions_built_in"))
     monkeypatch.setitem(sys.modules, "extensions_built_in.diffusion_models", types.ModuleType("extensions_built_in.diffusion_models"))
@@ -147,6 +152,74 @@ def test_driver_ideogram4_comfy_hooks(monkeypatch):
     # Original (LDM) VAE layouts skip the diffusers converter; diffusers layouts use it.
     assert module.convert_diffusers_state_dict({"decoder.mid.attn_1.k.weight": 1}) == {"decoder.mid.attn_1.k.weight": 1}
     assert module.convert_diffusers_state_dict({"decoder.conv_in.weight": 1})["converted"] is True
+
+
+def test_driver_ideogram4_comfy_text_encoder_hook(monkeypatch):
+    """A Comfy FP8 single-file TE must split weights from tokenizer/config (#446 follow-up)."""
+    import sys
+    import types
+
+    calls: dict = {}
+    module, _, _ = _fake_extension(monkeypatch, calls)
+    original_te = module._load_text_encoder
+    driver.apply_ideogram4_comfy_inputs({})
+    wrapped = module._load_text_encoder
+    assert wrapped is not original_te
+
+    # Fake upstream toolkit modules the wrapper imports at call time.
+    toolkit = types.ModuleType("toolkit")
+    basic = types.ModuleType("toolkit.basic")
+    basic.flush = lambda: None
+    encoders = types.ModuleType("toolkit.models.v2.text_encoders")
+    qwen3_vl = types.ModuleType("toolkit.models.v2.text_encoders.qwen3_vl")
+    loaded: dict = {}
+
+    class _Encoder:
+        @staticmethod
+        def load_model(path, **kwargs):
+            loaded["path"] = path
+            loaded["kwargs"] = kwargs
+            return types.SimpleNamespace(eval=lambda: None, requires_grad_=lambda _flag: None)
+
+    qwen3_vl.Qwen3VLModelEncoder = _Encoder
+    monkeypatch.setitem(sys.modules, "toolkit", toolkit)
+    monkeypatch.setitem(sys.modules, "toolkit.basic", basic)
+    monkeypatch.setitem(sys.modules, "toolkit.models", types.ModuleType("toolkit.models"))
+    monkeypatch.setitem(sys.modules, "toolkit.models.v2", types.ModuleType("toolkit.models.v2"))
+    monkeypatch.setitem(sys.modules, "toolkit.models.v2.text_encoders", encoders)
+    monkeypatch.setitem(sys.modules, "toolkit.models.v2.text_encoders.qwen3_vl", qwen3_vl)
+
+    # The tokenizer would talk to the Hub for a non-existent local path; stub it.
+    import transformers
+
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained",
+        staticmethod(lambda *args, **kwargs: "tokenizer"),
+        raising=True,
+    )
+
+    class _Self:
+        torch_dtype = "bf16"
+        model_config = types.SimpleNamespace(model_kwargs={
+            "text_encoder_path": "/models/qwen3vl_8b_fp8_scaled.safetensors",
+            "text_encoder_tokenizer_path": "/models/qwen3-vl-8b-instruct",
+        })
+
+        def print_and_status_update(self, _message):
+            pass
+
+    wrapped(_Self(), "/base")
+    assert "text_encoder" not in calls  # the original loader must not run
+    assert loaded["path"] == "/models/qwen3vl_8b_fp8_scaled.safetensors"
+    assert loaded["kwargs"]["config_path"] == "/models/qwen3-vl-8b-instruct"
+    assert loaded["kwargs"]["use_comfy_weights"] is False
+
+    # A directory TE keeps upstream's original behaviour.
+    class _DirSelf(_Self):
+        model_config = types.SimpleNamespace(model_kwargs={"text_encoder_path": "/models/qwen3-vl-8b-instruct"})
+
+    assert wrapped(_DirSelf(), "/base") == "original-te"
+    assert calls["text_encoder"] == "/base"
 
 
 def test_driver_ideogram4_ignores_other_architectures():
