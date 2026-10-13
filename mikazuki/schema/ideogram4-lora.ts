@@ -35,8 +35,8 @@ Schema.intersect([
     }).description("保存设置"),
 
     Schema.object({
-        max_train_epochs: Schema.number().min(1).default(16).description("最大训练 epoch（轮数）"),
-        max_train_steps: Schema.number().min(1).description("最大训练步数（设置了 epoch 时由 epoch 推导，可不填）"),
+        max_train_epochs: Schema.number().min(1).default(16).description("最大训练 epoch（轮数）。与 max_train_steps 同时填写时以步数为准，此项会被忽略并提示"),
+        max_train_steps: Schema.number().min(1).description("最大训练步数。与 max_train_epochs 同时填写时以步数为准（epoch 会被忽略并提示）；只填 epoch 时由 epoch 推导，可不填"),
         train_batch_size: Schema.number().min(1).default(1).description("批量大小, 越高显存占用越高"),
         gradient_checkpointing: Schema.boolean().default(true).description("梯度检查点（9.3B 底模建议开启）"),
         gradient_accumulation_steps: Schema.number().min(1).default(1).description("梯度累加步数"),

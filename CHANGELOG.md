@@ -16,6 +16,11 @@
 
 - **标签编辑的「选择已有数据集」弹窗为空（#440）**：`ManagedDatasetPicker` 现在会监听受控的 `open` 属性（标签编辑隐藏内部按钮、直接控制弹窗），弹窗打开时执行与内部按钮相同的初始化并拉取数据集列表；关闭后重开正常刷新，`browse()` 的 generation 机制继续防止并发响应覆盖
 
+### 修复（近一个月 issue 第四批）
+
+- **底模已是 FP8 时自动关闭 fp8_base/fp8_scaled（#417）**：只读 safetensors 头部探测 DiT 的 dtype，已是 FP8 权重时自动关闭这两项并提示（两个都关本就是合法状态），不再等到上游拒绝；非 FP8 底模的成对约束不变
+- **max_train_steps 与 max_train_epochs 同时填写（#418）**：musubi 侧以 epoch 优先，会让「steps=100」实跑到按 epoch 推导的步数；现在按**步数优先**只保留 max_train_steps 并明确提示，表单两处文案也写清「以步数为准」
+
 ### 新增
 
 - **Windows 启动器 `NextTrainer.exe`（#435）**：放在整合包根目录（与 `启动.bat` 并存）。双击启动等价于 `启动.bat`，但接管进程树：关窗 / `Q` 真正停掉服务，端口占用或启动失败给中文提示，`U` 一键更新（先停服 → 运行更新脚本 → `R` 重启）。C# NativeAOT 编译（约 5 MB，无 .NET 运行时依赖）。构建脚本 `build-scripts/06-build-launcher.ps1`，已接入 2026 全量 / musubi-only / kohya-only / resume 的打包流程
