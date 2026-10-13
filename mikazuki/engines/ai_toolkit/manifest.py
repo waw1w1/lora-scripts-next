@@ -17,7 +17,7 @@ UPSTREAM = {
 FEATURE_FLAG_ENV = "LORA_ENABLE_AI_TOOLKIT"
 
 CAPABILITIES = {
-    "model_families": ["sdxl", "flux", "flux2-klein", "krea2", "anima", "qwen-image-21"],
+    "model_families": ["sdxl", "sd15", "flux", "flux2-klein", "krea2", "anima", "qwen-image-21", "ideogram4"],
     "tasks": ["lora"],
     "variants": list(MODELS),
     "models": MODELS,

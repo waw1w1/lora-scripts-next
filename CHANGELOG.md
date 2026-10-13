@@ -8,6 +8,9 @@
 （下一个开发周期：AI Toolkit 模型格式与训练体验，详见 docs/roadmap.md）
 
 - **训练引擎下拉显示安装状态（#443）**：每个引擎带状态后缀（已就绪 / 未安装 / 需修复 / 安装中 / 已停用 / 未验证），模型不支持的引擎继续灰显并保留「该模型暂不支持」提示，另加一条可操作提示列出「当前模型支持但未安装/待修复」的引擎；引擎状态接口失败时静默降级为纯引擎名
+- **AI Toolkit 新增 SD 1.5 与 Ideogram 4 LoRA（#446）**：两个模型都直接读取 Comfy 格式单文件，无需用户转换 diffusers 目录
+  - **SD 1.5（arch `sd1`）**：`single_file` 模式加载 Comfy/LDM 全量 checkpoint（`model.diffusion_model.*` / `cond_stage_model.*` / `first_stage_model.*`），由驱动层绑定本地 diffusers 配置目录（仅 config 与 tokenizer，不含权重，默认 `sd-models/sd15/config`，可由「训练用模型」面板从 HF / ModelScope 下载），离线启动不访问 Hub
+  - **Ideogram 4（arch `ideogram4`）**：`comfyui_files` 模式直接使用 Comfy-Org 单文件（条件 DiT + Flux2 VAE，与 Musubi 同一套下载源），驱动层在内存中整理 FP8 `weight_scale` 形状并剔除 `comfy_quant` 标记后交给上游扩展，不写 diffusers 目录、不产生缓存副本；文本编码器使用本地 Qwen3-VL-8B BF16 目录。沿用**非商用**许可提示，整合包不预置权重
 
 ### 修复（近一个月 issue 第三批）
 

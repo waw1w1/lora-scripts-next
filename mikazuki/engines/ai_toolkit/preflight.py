@@ -127,12 +127,28 @@ def run_preflight(
         try:
             validate_assets(assets)
             facts["model_assets"] = assets
+            if variant == "ideogram4" and assets.get("mode") == "comfyui_files":
+                # The Comfy-Org single files are fed to the unmodified upstream
+                # extension by the pack driver; nothing is converted on disk.
+                facts["comfy_in_place"] = {
+                    "transformer": assets["components"]["transformer"],
+                    "vae": assets["components"]["vae"],
+                    "text_encoder": assets["text_encoder"],
+                    "conversion_cache": None,
+                }
+                warnings.append(
+                    "Ideogram 4 将直接读取 Comfy 单文件组件（条件 DiT + Flux2 VAE），"
+                    "由引擎驱动在内存中整理 FP8 缩放形状并剔除 comfy_quant 标记，"
+                    f"不写入 diffusers 目录、不产生缓存副本；文本编码器使用本地目录: {assets['text_encoder']}"
+                )
         except (ValueError, OSError, KeyError, TypeError) as exc:
             errors.append(str(exc))
     if not (runtime.toolkit_root / "run.py").is_file():
         errors.append(f"AI Toolkit 启动脚本不存在: {runtime.toolkit_root / 'run.py'}")
     if variant == "qwen-image-21" and not (runtime.toolkit_root / "extensions_built_in/diffusion_models/qwen_image_2/qwen_image_2.py").is_file():
         errors.append("当前 AI Toolkit 版本不含 Qwen Image 2.1，请在设置中卸载后安装当前固定版本")
+    if variant == "ideogram4" and not (runtime.toolkit_root / "extensions_built_in/diffusion_models/ideogram4/ideogram4.py").is_file():
+        errors.append("当前 AI Toolkit 版本不含 Ideogram 4，请在设置中卸载后安装当前固定版本")
     facts["dataset_image_count"] = len({str(image.resolve()) for entry in datasets for image in Path(entry["folder_path"]).iterdir() if image.is_file() and image.suffix.lower() in IMAGE_EXTS})
     if not facts["dataset_image_count"]:
         errors.append("数据集目录没有图片")

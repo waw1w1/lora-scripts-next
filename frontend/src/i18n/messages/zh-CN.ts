@@ -223,6 +223,8 @@ export default {
       "ideogram4-lora": { title: "Ideogram 4 LoRA", area: "Ideogram 4 · Musubi-Tuner · LoRA" },
       "qwen-image-21-lora": { title: "Qwen-Image-2.1 LoRA", area: "Qwen-Image-2.1 · DiffSynth-Studio · LoRA" },
       "ai-toolkit-sdxl-lora": { title: "SDXL LoRA", area: "SDXL · AI Toolkit · LoRA" },
+      "ai-toolkit-sd15-lora": { title: "SD 1.5 LoRA", area: "SD 1.5 · AI Toolkit · LoRA" },
+      "ai-toolkit-ideogram4-lora": { title: "Ideogram 4 LoRA", area: "Ideogram 4 · AI Toolkit · LoRA（非商用许可）" },
       "ai-toolkit-flux-lora": { title: "Flux LoRA", area: "Flux · AI Toolkit · LoRA" },
       "ai-toolkit-anima-lora": { title: "Anima LoRA", area: "Anima · AI Toolkit · LoRA" },
       "ai-toolkit-krea2-lora": { title: "Krea 2 LoRA", area: "Krea 2 · AI Toolkit · LoRA" },

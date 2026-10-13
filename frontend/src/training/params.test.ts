@@ -12,6 +12,8 @@ describe("training parameter conversion", () => {
   it.each([
     "klein-lora",
     "ai-toolkit-sdxl-lora",
+    "ai-toolkit-sd15-lora",
+    "ai-toolkit-ideogram4-lora",
     "ai-toolkit-flux-lora",
     "ai-toolkit-anima-lora",
     "ai-toolkit-krea2-lora",
