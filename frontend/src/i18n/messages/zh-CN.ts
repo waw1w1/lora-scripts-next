@@ -794,6 +794,11 @@ export default {
         advancedShort: "高级设置",
         close: "关闭",
         presets: {
+          auto: {
+            title: "自动（跟随引擎默认）",
+            hint: "不覆盖引擎内置默认源",
+            note: "每个通道由引擎安装器决定（如 Hugging Face 默认 hf-mirror.com）。不确定时推荐。",
+          },
           official: {
             title: "全部官方",
             hint: "不使用任何镜像，直连官网",
@@ -827,6 +832,7 @@ export default {
         },
         choices: {
           pip: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             tsinghua: "清华 TUNA",
             aliyun: "阿里云",
@@ -834,6 +840,7 @@ export default {
             custom: "自定义 URL",
           },
           pytorch: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             aliyun: "阿里云 pytorch-wheels",
             tsinghua: "清华 TUNA pytorch-wheels",
@@ -841,18 +848,21 @@ export default {
             custom: "自定义 URL",
           },
           huggingface: {
+            auto: "自动（引擎默认 hf-mirror）",
             official: "官网 / 原生",
             "hf-mirror": "hf-mirror.com（推荐）",
             modelscope: "ModelScope HF 兼容端点",
             custom: "自定义 URL",
           },
           github: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             ghfast: "ghfast.top（推荐）",
             ghproxy: "mirror.ghproxy.com",
             custom: "自定义前缀 URL",
           },
         },
+        engineDefault: "跟随引擎默认",
         placeholders: {
           pip: "https://…/simple",
           pytorch: "https://download.pytorch.org/whl/…",
@@ -860,9 +870,9 @@ export default {
           github: "https://mirror.example/https://github.com/",
         },
         save: "保存下载源",
-        reset: "恢复官方默认",
+        reset: "恢复默认（自动）",
         saved: "下载源已保存",
-        resetDone: "已恢复官方默认",
+        resetDone: "已恢复为自动默认",
       },
       catalog: {
         diffsynth: {

@@ -19,12 +19,46 @@ afterEach(() => {
 })
 
 describe("downloadSources", () => {
-  it("defaults to official / native", () => {
+  it("defaults to auto (engine installer defaults) and sends an empty payload", () => {
+    const prefs = readDownloadSources()
+    expect(prefs.preset).toBe("auto")
+    expect(prefs.pip.choice).toBe("auto")
+    expect(prefs.pytorch.choice).toBe("auto")
+    expect(prefs.huggingface.choice).toBe("auto")
+    expect(prefs.github.choice).toBe("auto")
+    expect(resolvePipIndexUrl(prefs)).toBe("")
+    expect(resolveHfEndpoint(prefs)).toBe("")
+    expect(resolveGithubPrefix(prefs)).toBe("")
+    expect(resolvedDownloadSourcesPayload()).toEqual({})
+  })
+
+  it("keeps explicit legacy official prefs instead of rewriting them to auto", () => {
+    writeDownloadSources({
+      preset: "official",
+      pip: { choice: "official", customUrl: "" },
+      pytorch: { choice: "official", customUrl: "" },
+      huggingface: { choice: "official", customUrl: "" },
+      github: { choice: "official", customUrl: "" },
+    })
     const prefs = readDownloadSources()
     expect(prefs.preset).toBe("official")
     expect(resolvePipIndexUrl(prefs)).toContain("pypi.org")
     expect(resolveHfEndpoint(prefs)).toContain("huggingface.co")
-    expect(resolveGithubPrefix(prefs)).toBe("")
+    expect(resolvedDownloadSourcesPayload()).toEqual({
+      pip_index_url: "https://pypi.org/simple",
+      pytorch_index_url: "https://download.pytorch.org/whl",
+      hf_endpoint: "https://huggingface.co",
+    })
+  })
+
+  it("falls back to auto for unknown stored values", () => {
+    localStorage.setItem(
+      DOWNLOAD_SOURCES_KEY,
+      JSON.stringify({ preset: "mars", pip: { choice: "unknown-mirror" } }),
+    )
+    const prefs = readDownloadSources()
+    expect(prefs.preset).toBe("auto")
+    expect(prefs.pip.choice).toBe("auto")
   })
 
   it("applies china preset mirrors", () => {
@@ -34,6 +68,12 @@ describe("downloadSources", () => {
     expect(resolvePytorchIndexUrl(prefs)).toContain("aliyun.com/pytorch-wheels")
     expect(resolveHfEndpoint(prefs)).toContain("hf-mirror.com")
     expect(resolveGithubPrefix(prefs)).toBe("https://ghfast.top/")
+  })
+
+  it("applies auto preset as engine defaults", () => {
+    const prefs = applyPreset("auto", chinaDownloadSources())
+    expect(prefs).toEqual(defaultDownloadSources())
+    expect(resolvedDownloadSourcesPayload(prefs)).toEqual({})
   })
 
   it("persists custom pip url", () => {
@@ -50,6 +90,15 @@ describe("downloadSources", () => {
       pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
       hf_endpoint: "https://hf-mirror.com",
       github_url_prefix: "https://ghfast.top/",
+    })
+  })
+
+  it("omits only the auto channels from a mixed payload", () => {
+    const prefs = defaultDownloadSources()
+    prefs.huggingface = { choice: "hf-mirror", customUrl: "" }
+    prefs.github = { choice: "official", customUrl: "" }
+    expect(resolvedDownloadSourcesPayload(prefs)).toEqual({
+      hf_endpoint: "https://hf-mirror.com",
     })
   })
 })

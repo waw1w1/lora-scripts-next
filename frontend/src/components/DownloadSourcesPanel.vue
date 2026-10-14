@@ -26,17 +26,19 @@ const draft = reactive<DownloadSourcesPrefs>(readDownloadSources())
 const advancedOpen = ref(false)
 const channelsOpen = ref(draft.preset === "custom")
 
-const pipOptions: PipChoice[] = ["official", "tsinghua", "aliyun", "douban", "custom"]
-const pytorchOptions: PytorchChoice[] = ["official", "aliyun", "tsinghua", "bfsu", "custom"]
-const hfOptions: HfChoice[] = ["official", "hf-mirror", "modelscope", "custom"]
-const githubOptions: GithubChoice[] = ["official", "ghfast", "ghproxy", "custom"]
-const presets = ["official", "china"] as const
+const pipOptions: PipChoice[] = ["auto", "official", "tsinghua", "aliyun", "douban", "custom"]
+const pytorchOptions: PytorchChoice[] = ["auto", "official", "aliyun", "tsinghua", "bfsu", "custom"]
+const hfOptions: HfChoice[] = ["auto", "official", "hf-mirror", "modelscope", "custom"]
+const githubOptions: GithubChoice[] = ["auto", "official", "ghfast", "ghproxy", "custom"]
+const presets = ["auto", "official", "china"] as const
 
 const resolved = computed(() => ({
-  pip: resolvePipIndexUrl(draft),
-  pytorch: resolvePytorchIndexUrl(draft),
-  huggingface: resolveHfEndpoint(draft),
-  github: resolveGithubPrefix(draft) || t("settings.engines.downloadSources.choices.github.official"),
+  pip: resolvePipIndexUrl(draft) || t("settings.engines.downloadSources.engineDefault"),
+  pytorch: resolvePytorchIndexUrl(draft) || t("settings.engines.downloadSources.engineDefault"),
+  huggingface: resolveHfEndpoint(draft) || t("settings.engines.downloadSources.engineDefault"),
+  github: draft.github.choice === "auto"
+    ? t("settings.engines.downloadSources.engineDefault")
+    : resolveGithubPrefix(draft) || t("settings.engines.downloadSources.choices.github.official"),
 }))
 
 const choiceLabels = computed(() => ({
@@ -64,7 +66,7 @@ function persist() {
   emit("saved")
 }
 
-function onPresetSelect(preset: "official" | "china") {
+function onPresetSelect(preset: "auto" | "official" | "china") {
   Object.assign(draft, applyPreset(preset, draft))
   channelsOpen.value = false
   persist()
@@ -99,7 +101,7 @@ function openAdvanced() {
 }
 
 function onCompactPreset(value: string) {
-  if (value === "official" || value === "china") onPresetSelect(value)
+  if (value === "auto" || value === "official" || value === "china") onPresetSelect(value)
 }
 
 defineExpose({ openAdvanced, reload: () => Object.assign(draft, readDownloadSources()) })
@@ -113,6 +115,7 @@ defineExpose({ openAdvanced, reload: () => Object.assign(draft, readDownloadSour
       data-testid="download-sources-compact-preset"
       @change="onCompactPreset(($event.target as HTMLSelectElement).value)"
     >
+      <option value="auto">{{ t("settings.engines.downloadSources.presets.auto.title") }}</option>
       <option value="official">{{ t("settings.engines.downloadSources.presets.official.title") }}</option>
       <option value="china">{{ t("settings.engines.downloadSources.presets.china.short") }}</option>
       <option v-if="isCustom" value="custom" disabled>{{ t("settings.engines.downloadSources.presets.custom.title") }}</option>

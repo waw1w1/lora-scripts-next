@@ -794,6 +794,11 @@ export default {
         advancedShort: "Advanced",
         close: "Close",
         presets: {
+          auto: {
+            title: "Auto (engine defaults)",
+            hint: "Keep the engine installer's built-in sources",
+            note: "Each channel follows the engine installer default (e.g. Hugging Face → hf-mirror.com). Recommended when unsure.",
+          },
           official: {
             title: "Official",
             hint: "No mirrors; use official endpoints",
@@ -827,6 +832,7 @@ export default {
         },
         choices: {
           pip: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             tsinghua: "Tsinghua TUNA",
             aliyun: "Aliyun",
@@ -834,6 +840,7 @@ export default {
             custom: "Custom URL",
           },
           pytorch: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             aliyun: "Aliyun pytorch-wheels",
             tsinghua: "Tsinghua TUNA pytorch-wheels",
@@ -841,18 +848,21 @@ export default {
             custom: "Custom URL",
           },
           huggingface: {
+            auto: "Auto (engine default: hf-mirror)",
             official: "Official / native",
             "hf-mirror": "hf-mirror.com (recommended)",
             modelscope: "ModelScope HF-compatible endpoint",
             custom: "Custom URL",
           },
           github: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             ghfast: "ghfast.top (recommended)",
             ghproxy: "mirror.ghproxy.com",
             custom: "Custom prefix URL",
           },
         },
+        engineDefault: "Follows engine default",
         placeholders: {
           pip: "https://…/simple",
           pytorch: "https://download.pytorch.org/whl/…",
@@ -860,9 +870,9 @@ export default {
           github: "https://mirror.example/https://github.com/",
         },
         save: "Save download sources",
-        reset: "Reset to official",
+        reset: "Reset to auto defaults",
         saved: "Download sources saved",
-        resetDone: "Reset to official defaults",
+        resetDone: "Reset to auto defaults",
       },
       catalog: {
         diffsynth: {
