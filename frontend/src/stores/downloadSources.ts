@@ -36,6 +36,11 @@ export const useDownloadSourcesStore = defineStore("downloadSources", () => {
     prefs.value = readDownloadSources()
   }
 
+  function clearResults() {
+    results.value = {}
+    timedOut.value.clear()
+  }
+
   function statusFor(channel: SourceCheckChannel): SourceStatus {
     const result = results.value[channel]
     if (result) return statusOf(result)
@@ -102,5 +107,5 @@ export const useDownloadSourcesStore = defineStore("downloadSources", () => {
     await checkAll()
   }
 
-  return { prefs, results, checking, statusFor, resultFor, presumedFail, reloadPrefs, checkAll, checkOnce }
+  return { prefs, results, checking, statusFor, resultFor, presumedFail, reloadPrefs, clearResults, checkAll, checkOnce }
 })

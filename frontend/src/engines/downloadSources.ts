@@ -19,12 +19,18 @@ export interface ChannelConfig<T extends string> {
   customUrl: string
 }
 
+/** Outgoing proxy for all four channels (applies to install subprocesses and probes). Empty URL = no proxy. */
+export interface ProxyConfig {
+  url: string
+}
+
 export interface DownloadSourcesPrefs {
   preset: SourcePreset
   pip: ChannelConfig<PipChoice>
   pytorch: ChannelConfig<PytorchChoice>
   huggingface: ChannelConfig<HfChoice>
   github: ChannelConfig<GithubChoice>
+  proxy: ProxyConfig
 }
 
 export const PIP_URLS: Record<Exclude<PipChoice, "custom" | "auto">, string> = {
@@ -66,6 +72,7 @@ export function defaultDownloadSources(): DownloadSourcesPrefs {
     pytorch: { choice: "auto", customUrl: "" },
     huggingface: { choice: "auto", customUrl: "" },
     github: { choice: "auto", customUrl: "" },
+    proxy: { url: "" },
   }
 }
 
@@ -77,6 +84,7 @@ export function chinaDownloadSources(): DownloadSourcesPrefs {
     pytorch: { choice: "aliyun", customUrl: "" },
     huggingface: { choice: "hf-mirror", customUrl: "" },
     github: { choice: "ghfast", customUrl: "" },
+    proxy: { url: "" },
   }
 }
 
@@ -116,6 +124,10 @@ export function readDownloadSources(): DownloadSourcesPrefs {
         choice: asChoice(parsed.github?.choice, ["auto", "official", "ghfast", "ghproxy", "custom"] as const, "auto"),
         customUrl: typeof parsed.github?.customUrl === "string" ? parsed.github.customUrl : "",
       },
+      proxy: {
+        // Legacy shape had { enabled, url }: a disabled proxy drops its URL.
+        url: parsed.proxy?.enabled === false ? "" : typeof parsed.proxy?.url === "string" ? parsed.proxy.url : "",
+      },
     }
   } catch {
     return fallback
@@ -128,7 +140,7 @@ export function writeDownloadSources(prefs: DownloadSourcesPrefs) {
 }
 
 export function applyPreset(preset: SourcePreset, current: DownloadSourcesPrefs): DownloadSourcesPrefs {
-  if (preset === "auto") return defaultDownloadSources()
+  if (preset === "auto") return { ...defaultDownloadSources(), proxy: current.proxy }
   if (preset === "official") {
     return {
       preset: "official",
@@ -136,9 +148,10 @@ export function applyPreset(preset: SourcePreset, current: DownloadSourcesPrefs)
       pytorch: { choice: "official", customUrl: "" },
       huggingface: { choice: "official", customUrl: "" },
       github: { choice: "official", customUrl: "" },
+      proxy: current.proxy,
     }
   }
-  if (preset === "china") return chinaDownloadSources()
+  if (preset === "china") return { ...chinaDownloadSources(), proxy: current.proxy }
   return { ...current, preset: "custom" }
 }
 
@@ -173,6 +186,7 @@ export interface DownloadSourcesPayload {
   pytorch_index_url?: string
   hf_endpoint?: string
   github_url_prefix?: string
+  proxy_url?: string
 }
 
 /**
@@ -189,6 +203,7 @@ export function resolvedDownloadSourcesPayload(prefs: DownloadSourcesPrefs = rea
   if (pytorch) payload.pytorch_index_url = pytorch
   if (hf) payload.hf_endpoint = hf
   if (github) payload.github_url_prefix = github
+  if (prefs.proxy.url.trim()) payload.proxy_url = prefs.proxy.url.trim()
   return payload
 }
 

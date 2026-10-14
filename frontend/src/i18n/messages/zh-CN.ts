@@ -885,6 +885,11 @@ export default {
         checkAll: "检测全部源",
         checking: "检测中…",
         applyChina: "应用国内加速预设",
+        proxy: {
+          label: "网络代理",
+          placeholder: "留空不使用代理；例如 http://127.0.0.1:7890",
+          hint: "手动代理对四个通道同时生效，包括引擎安装与连通性检测。留空表示不使用代理。",
+        },
       },
       catalog: {
         diffsynth: {

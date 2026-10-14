@@ -885,6 +885,11 @@ export default {
         checkAll: "Check all sources",
         checking: "Checking…",
         applyChina: "Apply China preset",
+        proxy: {
+          label: "Network proxy",
+          placeholder: "Leave empty for no proxy; e.g. http://127.0.0.1:7890",
+          hint: "The manual proxy applies to all four channels, including engine installs and connectivity checks. Leave empty for no proxy.",
+        },
       },
       catalog: {
         diffsynth: {

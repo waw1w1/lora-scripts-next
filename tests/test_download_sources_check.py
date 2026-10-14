@@ -89,22 +89,62 @@ class ProbeTests(unittest.TestCase):
         self.assertIn("scheme", result["error"])
 
     def test_check_aggregates_all_channels(self):
-        with mock.patch("mikazuki.download_sources_check.urllib.request.urlopen", return_value=_FakeResponse(200)):
+        with mock.patch("mikazuki.download_sources_check._probe", return_value={"ok": True}):
             data = asyncio.run(check_download_sources(None))
         self.assertEqual(set(data), {"pip", "pytorch", "huggingface", "github"})
         self.assertTrue(all(entry["ok"] for entry in data.values()))
 
     def test_check_single_channel_only(self):
-        with mock.patch("mikazuki.download_sources_check.urllib.request.urlopen", return_value=_FakeResponse(200)) as urlopen_mock:
+        with mock.patch("mikazuki.download_sources_check._probe", return_value={"ok": True}) as probe_mock:
             data = asyncio.run(check_download_sources(None, ["huggingface"]))
         self.assertEqual(set(data), {"huggingface"})
-        self.assertEqual(urlopen_mock.call_count, 1)
+        self.assertEqual(probe_mock.call_count, 1)
 
     def test_check_ignores_unknown_channel_names(self):
-        with mock.patch("mikazuki.download_sources_check.urllib.request.urlopen", return_value=_FakeResponse(200)):
+        with mock.patch("mikazuki.download_sources_check._probe", return_value={"ok": True}):
             data = asyncio.run(check_download_sources(None, ["pip", "bogus"]))
         self.assertEqual(set(data), {"pip"})
 
+    def test_proxy_url_uses_proxy_handler_opener(self):
+        opener = mock.MagicMock()
+        opener.open.return_value = _FakeResponse(200)
+        proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+        with mock.patch("mikazuki.download_sources_check.urllib.request.build_opener", return_value=opener) as build_mock:
+            result = _probe("https://pypi.org/simple/", proxies=proxies)
+        self.assertTrue(result["ok"])
+        handler = build_mock.call_args.args[0]
+        self.assertEqual(handler.proxies, proxies)
+
+    def test_empty_proxy_map_disables_ambient_env_proxy(self):
+        opener = mock.MagicMock()
+        opener.open.return_value = _FakeResponse(200)
+        with mock.patch("mikazuki.download_sources_check.urllib.request.build_opener", return_value=opener) as build_mock:
+            result = _probe("https://pypi.org/simple/", proxies={})
+        self.assertTrue(result["ok"])
+        handler = build_mock.call_args.args[0]
+        self.assertEqual(handler.proxies, {})
+
+    def test_check_passes_proxy_to_every_channel(self):
+        sources = DownloadSources(proxy_url="http://127.0.0.1:7890")
+        with mock.patch("mikazuki.download_sources_check._probe", return_value={"ok": True}) as probe_mock:
+            asyncio.run(check_download_sources(sources, ["pip", "github"]))
+        for call in probe_mock.call_args_list:
+            self.assertEqual(call.args[2], {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"})
+
+    def test_check_uses_policy_proxies_without_override(self):
+        policy = {"http": "http://policy-proxy:8080", "https": "http://policy-proxy:8080"}
+        with mock.patch("mikazuki.download_sources_check._policy_proxies", return_value=policy), mock.patch(
+            "mikazuki.download_sources_check._probe", return_value={"ok": True}
+        ) as probe_mock:
+            asyncio.run(check_download_sources(None, ["pip"]))
+        self.assertEqual(probe_mock.call_args.args[2], policy)
+
+    def test_policy_proxies_ignores_ambient_env(self):
+        from mikazuki.download_sources_check import _policy_proxies
+
+        with mock.patch.dict("os.environ", {"http_proxy": "http://ambient:1", "https_proxy": "http://ambient:1"}):
+            proxies = _policy_proxies()
+        self.assertNotEqual(proxies.get("http"), "http://ambient:1")
 
 
 class ProbeTargetsEnvTests(unittest.TestCase):

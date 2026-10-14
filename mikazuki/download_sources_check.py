@@ -66,7 +66,31 @@ def probe_targets(sources: DownloadSources | None) -> dict[str, str]:
     }
 
 
-def _probe(url: str, timeout: float = PROBE_TIMEOUT_SECONDS) -> dict[str, Any]:
+def _policy_proxies() -> dict[str, str]:
+    """Proxies from the resolved network policy, matching install_process_env().
+
+    The installer strips ambient proxy variables and applies the saved policy,
+    so probes must do the same instead of relying on urllib's ambient env.
+    """
+    from mikazuki.networking import resolve_policy
+
+    env = resolve_policy().process_env()
+    proxies: dict[str, str] = {}
+    for scheme in ("http", "https"):
+        value = env.get(f"{scheme}_proxy") or env.get(f"{scheme.upper()}_PROXY")
+        if value:
+            proxies[scheme] = value
+    no_proxy = env.get("no_proxy") or env.get("NO_PROXY")
+    if no_proxy:
+        proxies["no"] = no_proxy
+    return proxies
+
+
+def _probe(
+    url: str,
+    timeout: float = PROBE_TIMEOUT_SECONDS,
+    proxies: dict[str, str] | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {"ok": False, "status": None, "latency_ms": None, "url": url, "error": None}
     if not url.startswith(("http://", "https://")):
         result["error"] = f"unsupported URL scheme: {url}"
@@ -74,7 +98,13 @@ def _probe(url: str, timeout: float = PROBE_TIMEOUT_SECONDS) -> dict[str, Any]:
     start = time.monotonic()
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "SD-Trainer"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        if proxies is not None:
+            # Explicit proxy map (possibly empty) disables urllib's ambient env.
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+            resp_cm = opener.open(req, timeout=timeout)
+        else:
+            resp_cm = urllib.request.urlopen(req, timeout=timeout)
+        with resp_cm as resp:
             result["status"] = resp.status
             resp.read(256)
         result["ok"] = True
@@ -97,6 +127,12 @@ async def check_download_sources(
     channel so a hanging mirror never delays the others' results.
     """
     targets = probe_targets(sources)
+    proxy_url = (sources.proxy_url if sources else None) or None
+    # A per-source override wins; otherwise probe through the resolved policy
+    # so the result reflects the route the installer will actually take.
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else _policy_proxies()
     names = [name for name in (channels or CHANNELS) if name in targets]
-    results = await asyncio.gather(*(asyncio.to_thread(_probe, targets[name]) for name in names))
+    results = await asyncio.gather(
+        *(asyncio.to_thread(_probe, targets[name], PROBE_TIMEOUT_SECONDS, proxies) for name in names)
+    )
     return dict(zip(names, results))

@@ -5,6 +5,7 @@ import unittest
 from mikazuki.download_sources import (
     DownloadSources,
     apply_github_prefix,
+    install_process_env,
     parse_download_sources,
     pytorch_extra_index_url,
 )
@@ -60,6 +61,25 @@ class DownloadSourcesTests(unittest.TestCase):
             pytorch_extra_index_url(None, "cu128", "https://download.pytorch.org/whl/cu128"),
             "https://download.pytorch.org/whl/cu128",
         )
+
+    def test_parse_proxy_url(self):
+        sources = parse_download_sources({"proxy_url": "http://127.0.0.1:7890"})
+        self.assertEqual(sources, DownloadSources(proxy_url="http://127.0.0.1:7890"))
+
+    def test_install_process_env_with_proxy_covers_both_cases(self):
+        env = install_process_env(DownloadSources(proxy_url="http://127.0.0.1:7890"))
+        self.assertIsNotNone(env)
+        assert env is not None
+        for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            self.assertEqual(env[key], "http://127.0.0.1:7890")
+        self.assertNotIn("HF_ENDPOINT", env)
+
+    def test_install_process_env_without_source_overrides_uses_network_policy(self):
+        for sources in (None, DownloadSources()):
+            env = install_process_env(sources)
+            self.assertNotIn("HF_ENDPOINT", env)
+            self.assertIn("HTTP_PROXY", env)
+            self.assertIn("HTTPS_PROXY", env)
 
 
 if __name__ == "__main__":

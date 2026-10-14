@@ -39,6 +39,7 @@ describe("downloadSources", () => {
       pytorch: { choice: "official", customUrl: "" },
       huggingface: { choice: "official", customUrl: "" },
       github: { choice: "official", customUrl: "" },
+      proxy: { url: "" },
     })
     const prefs = readDownloadSources()
     expect(prefs.preset).toBe("official")
@@ -100,5 +101,45 @@ describe("downloadSources", () => {
     expect(resolvedDownloadSourcesPayload(prefs)).toEqual({
       hf_endpoint: "https://hf-mirror.com",
     })
+  })
+
+  it("includes proxy_url only when a proxy URL is set", () => {
+    const prefs = defaultDownloadSources()
+    expect(resolvedDownloadSourcesPayload(prefs)).toEqual({})
+    prefs.proxy = { url: "  " }
+    expect(resolvedDownloadSourcesPayload(prefs)).toEqual({})
+    prefs.proxy = { url: "http://127.0.0.1:7890" }
+    expect(resolvedDownloadSourcesPayload(prefs)).toEqual({ proxy_url: "http://127.0.0.1:7890" })
+  })
+
+  it("preserves the proxy config across preset switches", () => {
+    const prefs = defaultDownloadSources()
+    prefs.proxy = { url: "http://127.0.0.1:7890" }
+    expect(applyPreset("china", prefs).proxy).toEqual(prefs.proxy)
+    expect(applyPreset("official", prefs).proxy).toEqual(prefs.proxy)
+    expect(applyPreset("auto", prefs).proxy).toEqual(prefs.proxy)
+  })
+
+  it("migrates legacy prefs without a proxy block to an empty proxy", () => {
+    localStorage.setItem(
+      DOWNLOAD_SOURCES_KEY,
+      JSON.stringify({ preset: "china", huggingface: { choice: "hf-mirror", customUrl: "" } }),
+    )
+    const prefs = readDownloadSources()
+    expect(prefs.proxy).toEqual({ url: "" })
+    expect(prefs.huggingface.choice).toBe("hf-mirror")
+  })
+
+  it("migrates the legacy enabled/url proxy shape, dropping a disabled proxy", () => {
+    localStorage.setItem(
+      DOWNLOAD_SOURCES_KEY,
+      JSON.stringify({ proxy: { enabled: true, url: "http://127.0.0.1:7890" } }),
+    )
+    expect(readDownloadSources().proxy).toEqual({ url: "http://127.0.0.1:7890" })
+    localStorage.setItem(
+      DOWNLOAD_SOURCES_KEY,
+      JSON.stringify({ proxy: { enabled: false, url: "http://127.0.0.1:7890" } }),
+    )
+    expect(readDownloadSources().proxy).toEqual({ url: "" })
   })
 })
