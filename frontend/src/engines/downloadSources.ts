@@ -2,6 +2,9 @@
 
 export const DOWNLOAD_SOURCES_KEY = "nt.training.downloadSources"
 
+/** Window event fired after prefs are saved so live UI (sidebar chips) can refresh. */
+export const DOWNLOAD_SOURCES_CHANGED_EVENT = "nt:download-sources-changed"
+
 export type SourcePreset = "auto" | "official" | "china" | "custom"
 
 /** "auto" defers to the engine installer defaults (e.g. HF → hf-mirror.com). */
@@ -121,6 +124,7 @@ export function readDownloadSources(): DownloadSourcesPrefs {
 
 export function writeDownloadSources(prefs: DownloadSourcesPrefs) {
   localStorage.setItem(DOWNLOAD_SOURCES_KEY, JSON.stringify(prefs))
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(DOWNLOAD_SOURCES_CHANGED_EVENT))
 }
 
 export function applyPreset(preset: SourcePreset, current: DownloadSourcesPrefs): DownloadSourcesPrefs {

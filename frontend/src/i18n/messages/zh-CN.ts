@@ -817,7 +817,7 @@ export default {
           },
         },
         advanced: "分项调整下载源",
-        advancedNote: "uv 自带 Python 运行时下载暂不可配。PyTorch 国内源同步可能不全/滞后，失败时请改回官网。GitHub 代理不稳定时也请改回「官网 / 原生」。",
+        advancedNote: "uv 自带 Python 运行时下载暂不可配。通道说明：「自动」由引擎安装器决定（HF 默认 hf-mirror.com）；清华 / 阿里 PyPI 与官网同步较快；国内 PyTorch wheels 可能滞后于官网版本；hf-mirror 与 ModelScope 模型覆盖范围不同；GitHub 加速为第三方代理服务。",
         channels: {
           pip: "pip（PyPI）",
           pytorch: "PyTorch",
@@ -863,6 +863,15 @@ export default {
           },
         },
         engineDefault: "跟随引擎默认",
+        chipsAria: "下载源连通状态，点击打开下载源设置",
+        status: {
+          unknown: "未检测",
+          checking: "检测中",
+          ok: "连通",
+          slow: "较慢",
+          fail: "不可达",
+          presumedFail: "响应超时，判定不可达（仍在等待）",
+        },
         placeholders: {
           pip: "https://…/simple",
           pytorch: "https://download.pytorch.org/whl/…",
@@ -873,6 +882,9 @@ export default {
         reset: "恢复默认（自动）",
         saved: "下载源已保存",
         resetDone: "已恢复为自动默认",
+        checkAll: "检测全部源",
+        checking: "检测中…",
+        applyChina: "应用国内加速预设",
       },
       catalog: {
         diffsynth: {

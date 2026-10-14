@@ -817,7 +817,7 @@ export default {
           },
         },
         advanced: "Per-channel download sources",
-        advancedNote: "The uv-managed Python runtime download is not configurable yet. Domestic PyTorch mirrors may lag or miss builds — fall back to Official if install fails. Do the same if a GitHub proxy is unstable.",
+        advancedNote: "The uv-managed Python runtime download is not configurable yet. Per-channel notes: \"auto\" follows the engine installer (HF defaults to hf-mirror.com); Tsinghua / Aliyun PyPI sync quickly; domestic PyTorch wheels may lag official builds; hf-mirror and ModelScope cover different model sets; GitHub acceleration uses third-party proxies.",
         channels: {
           pip: "pip (PyPI)",
           pytorch: "PyTorch",
@@ -863,6 +863,15 @@ export default {
           },
         },
         engineDefault: "Follows engine default",
+        chipsAria: "Download source connectivity, click to open download source settings",
+        status: {
+          unknown: "Not checked",
+          checking: "Checking",
+          ok: "Reachable",
+          slow: "Slow",
+          fail: "Unreachable",
+          presumedFail: "Timed out, presumed unreachable (still waiting)",
+        },
         placeholders: {
           pip: "https://…/simple",
           pytorch: "https://download.pytorch.org/whl/…",
@@ -873,6 +882,9 @@ export default {
         reset: "Reset to auto defaults",
         saved: "Download sources saved",
         resetDone: "Reset to auto defaults",
+        checkAll: "Check all sources",
+        checking: "Checking…",
+        applyChina: "Apply China preset",
       },
       catalog: {
         diffsynth: {
