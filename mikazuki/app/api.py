@@ -410,6 +410,22 @@ async def _engine_payload(request: Request) -> dict:
     return json.loads((await request.body()).decode("utf-8") or "{}")
 
 
+@router.post("/download-sources/check")
+async def download_sources_check(request: Request):
+    from mikazuki.download_sources import parse_download_sources
+    from mikazuki.download_sources_check import CHANNELS, check_download_sources
+
+    try:
+        payload = json.loads((await request.body()).decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    channel = payload.get("channel") if isinstance(payload, dict) else None
+    if channel is not None and channel not in CHANNELS:
+        return APIResponseFail(message=f"unknown download-source channel: {channel}")
+    sources = parse_download_sources(payload)
+    return APIResponseSuccess(data=await check_download_sources(sources, [channel] if channel else None))
+
+
 @router.get("/engines/{engine_id}/status")
 async def engine_status(engine_id: str):
     return await _engine_routes_module(engine_id).status()
