@@ -159,7 +159,16 @@ watch([model, engine, target], () => {
   void rememberSelection(model.value, engineToRemember, target.value).catch((error: unknown) => {
     ElMessage.error(error instanceof Error ? error.message : t("engineSettings.saveFailed"))
   })
-  router.replace({ query: { model: model.value, engine: engine.value, target: target.value } })
+  // Only persist engine in the URL when the user explicitly pinned it.
+  // Auto-selected engines must not pin on reload, or Fast can never replace a
+  // Kohya fallback after install.
+  router.replace({
+    query: {
+      model: model.value,
+      ...(enginePinned.value ? { engine: engine.value } : {}),
+      target: target.value,
+    },
+  })
 })
 </script>
 

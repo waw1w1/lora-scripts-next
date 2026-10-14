@@ -77,12 +77,19 @@ onMounted(() => { void load() })
           <span>{{ t("network.bypass") }}</span>
           <input v-model="draft.no_proxy" data-testid="network-bypass">
         </label>
-
-        <div class="network-actions">
-          <button type="submit" class="primary-action" :disabled="busy || !loaded">{{ t("network.save") }}</button>
-          <button v-if="error" type="button" class="secondary-action" :disabled="busy" @click="load">{{ t("datasetManage.retry") }}</button>
-        </div>
       </fieldset>
+
+      <div class="network-actions">
+        <button type="submit" class="primary-action" :disabled="busy || !loaded">{{ t("network.save") }}</button>
+        <button
+          v-if="error"
+          type="button"
+          class="secondary-action"
+          data-testid="network-retry"
+          :disabled="busy"
+          @click="load"
+        >{{ t("datasetManage.retry") }}</button>
+      </div>
     </form>
 
     <p v-if="effective" class="network-effective" role="status">
