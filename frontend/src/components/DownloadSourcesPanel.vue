@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive } from "vue"
+import { computed, onMounted, reactive } from "vue"
 import { ElMessage } from "element-plus"
 import { useI18n } from "vue-i18n"
 import {
   chinaDownloadSources,
   defaultDownloadSources,
-  readDownloadSources,
   resolveGithubPrefix,
   resolveHfEndpoint,
   resolvePipIndexUrl,
@@ -16,7 +15,6 @@ import {
   type HfChoice,
   type PipChoice,
   type PytorchChoice,
-  writeDownloadSources,
 } from "../engines/downloadSources"
 import type { SourceCheckChannel } from "../api/downloadSources"
 import { useDownloadSourcesStore } from "../stores/downloadSources"
@@ -25,7 +23,27 @@ const emit = defineEmits<{ saved: [] }>()
 
 const { t } = useI18n()
 const dsStore = useDownloadSourcesStore()
-const draft = reactive<DownloadSourcesPrefs>(readDownloadSources())
+const draft = reactive<DownloadSourcesPrefs>(defaultDownloadSources())
+
+function clonePrefs(prefs: DownloadSourcesPrefs): DownloadSourcesPrefs {
+  return {
+    ...prefs,
+    pip: { ...prefs.pip },
+    pytorch: { ...prefs.pytorch },
+    huggingface: { ...prefs.huggingface },
+    github: { ...prefs.github },
+    proxy: { ...prefs.proxy },
+  }
+}
+
+function syncDraft() {
+  Object.assign(draft, clonePrefs(dsStore.prefs))
+}
+
+onMounted(async () => {
+  await dsStore.ensureLoaded()
+  syncDraft()
+})
 
 const pipOptions: PipChoice[] = ["auto", "official", "tsinghua", "aliyun", "douban", "custom"]
 const pytorchOptions: PytorchChoice[] = ["auto", "official", "aliyun", "tsinghua", "bfsu", "custom"]
@@ -46,25 +64,16 @@ function onChannelChange() {
   dsStore.clearResults()
 }
 
-function saveAdvanced() {
-  writeDownloadSources({
-    ...draft,
-    pip: { ...draft.pip },
-    pytorch: { ...draft.pytorch },
-    huggingface: { ...draft.huggingface },
-    github: { ...draft.github },
-    proxy: { ...draft.proxy },
-  })
-  dsStore.reloadPrefs()
+async function saveAdvanced() {
+  await dsStore.savePrefs(clonePrefs(draft))
   void dsStore.checkAll()
   emit("saved")
   ElMessage.success(t("settings.engines.downloadSources.saved"))
 }
 
-function reset() {
-  Object.assign(draft, defaultDownloadSources())
-  writeDownloadSources(defaultDownloadSources())
-  dsStore.reloadPrefs()
+async function reset() {
+  await dsStore.savePrefs(defaultDownloadSources())
+  syncDraft()
   void dsStore.checkAll()
   emit("saved")
   ElMessage.success(t("settings.engines.downloadSources.resetDone"))
@@ -94,7 +103,7 @@ function channelCheckText(key: SourceCheckChannel) {
   return `${result.latency_ms ?? "?"} ms`
 }
 
-defineExpose({ reload: () => Object.assign(draft, readDownloadSources()) })
+defineExpose({ reload: async () => { await dsStore.ensureLoaded(); syncDraft() } })
 </script>
 
 <template>

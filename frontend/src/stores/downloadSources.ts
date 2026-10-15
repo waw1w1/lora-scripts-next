@@ -2,6 +2,10 @@ import { defineStore } from "pinia"
 import { computed, ref } from "vue"
 import { downloadSourcesApi, type SourceCheckChannel, type SourceCheckMap, type SourceCheckResult } from "../api/downloadSources"
 import {
+  clearLegacyDownloadSources,
+  defaultDownloadSources,
+  DOWNLOAD_SOURCES_KEY,
+  prefsFromServerSources,
   readDownloadSources,
   resolvedDownloadSourcesPayload,
   type DownloadSourcesPayload,
@@ -24,7 +28,7 @@ export function statusOf(result: SourceCheckResult | null | undefined): SourceSt
 }
 
 export const useDownloadSourcesStore = defineStore("downloadSources", () => {
-  const prefs = ref<DownloadSourcesPrefs>(readDownloadSources())
+  const prefs = ref<DownloadSourcesPrefs>(defaultDownloadSources())
   const results = ref<Partial<SourceCheckMap>>({})
   const pending = ref<Set<SourceCheckChannel>>(new Set())
   const timedOut = ref<Set<SourceCheckChannel>>(new Set())
@@ -32,8 +36,50 @@ export const useDownloadSourcesStore = defineStore("downloadSources", () => {
 
   const checking = computed(() => pending.value.size > 0)
 
-  function reloadPrefs() {
-    prefs.value = readDownloadSources()
+  let loadPromise: Promise<void> | null = null
+
+  /** Hydrate prefs from the backend-persisted config, migrating any legacy
+   * localStorage prefs once when the server has none saved yet. */
+  async function loadFromServer() {
+    try {
+      const state = await downloadSourcesApi.get()
+      const hadLegacy = localStorage.getItem(DOWNLOAD_SOURCES_KEY) !== null
+      if (state.configured) {
+        prefs.value = prefsFromServerSources(state.sources)
+      } else if (hadLegacy) {
+        const legacy = readDownloadSources()
+        const payload = resolvedDownloadSourcesPayload(legacy)
+        if (Object.keys(payload).length > 0) {
+          await downloadSourcesApi.save(payload)
+          prefs.value = legacy
+        } else {
+          prefs.value = defaultDownloadSources()
+        }
+      } else {
+        prefs.value = defaultDownloadSources()
+      }
+      if (hadLegacy) clearLegacyDownloadSources()
+    } catch {
+      // Keep defaults when the settings API is unreachable; chips stay "unknown".
+      prefs.value = defaultDownloadSources()
+    }
+  }
+
+  /** Shared hydration promise so concurrent callers load exactly once. */
+  function ensureLoaded(): Promise<void> {
+    if (!loadPromise) loadPromise = loadFromServer()
+    return loadPromise
+  }
+
+  async function reloadPrefs() {
+    loadPromise = null
+    await ensureLoaded()
+  }
+
+  /** Persist prefs to the backend and adopt them locally on success. */
+  async function savePrefs(next: DownloadSourcesPrefs) {
+    await downloadSourcesApi.save(resolvedDownloadSourcesPayload(next))
+    prefs.value = next
   }
 
   function clearResults() {
@@ -103,9 +149,9 @@ export const useDownloadSourcesStore = defineStore("downloadSources", () => {
   async function checkOnce() {
     if (didAutoCheck.value) return
     didAutoCheck.value = true
-    reloadPrefs()
+    await ensureLoaded()
     await checkAll()
   }
 
-  return { prefs, results, checking, statusFor, resultFor, presumedFail, reloadPrefs, clearResults, checkAll, checkOnce }
+  return { prefs, results, checking, statusFor, resultFor, presumedFail, ensureLoaded, reloadPrefs, savePrefs, clearResults, checkAll, checkOnce }
 })

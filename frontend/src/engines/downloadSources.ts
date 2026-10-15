@@ -1,9 +1,7 @@
-/** Download-source prefs for engine installs (Fast / Musubi). UI-first; backend wires later. */
+/** Download-source prefs for engine installs. Persisted on the backend; the
+ * localStorage key below survives only to migrate pre-persistence prefs once. */
 
 export const DOWNLOAD_SOURCES_KEY = "nt.training.downloadSources"
-
-/** Window event fired after prefs are saved so live UI (sidebar chips) can refresh. */
-export const DOWNLOAD_SOURCES_CHANGED_EVENT = "nt:download-sources-changed"
 
 export type SourcePreset = "auto" | "official" | "china" | "custom"
 
@@ -92,6 +90,8 @@ function asChoice<T extends string>(value: unknown, allowed: readonly T[], fallb
   return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T) : fallback
 }
 
+/** Legacy localStorage prefs, read only for the one-time migration to the
+ * backend-persisted config. Do not write new code against this. */
 export function readDownloadSources(): DownloadSourcesPrefs {
   const fallback = defaultDownloadSources()
   try {
@@ -134,9 +134,8 @@ export function readDownloadSources(): DownloadSourcesPrefs {
   }
 }
 
-export function writeDownloadSources(prefs: DownloadSourcesPrefs) {
-  localStorage.setItem(DOWNLOAD_SOURCES_KEY, JSON.stringify(prefs))
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(DOWNLOAD_SOURCES_CHANGED_EVENT))
+export function clearLegacyDownloadSources() {
+  localStorage.removeItem(DOWNLOAD_SOURCES_KEY)
 }
 
 export function applyPreset(preset: SourcePreset, current: DownloadSourcesPrefs): DownloadSourcesPrefs {
@@ -220,4 +219,41 @@ export function activeSourceSummary(prefs: DownloadSourcesPrefs): {
     huggingface: prefs.huggingface.choice,
     github: prefs.github.choice,
   }
+}
+
+function trimSlash(url: string): string {
+  return url.replace(/\/+$/, "")
+}
+
+function channelFromUrl<T extends string>(
+  url: string | null | undefined,
+  table: Record<string, string>,
+): ChannelConfig<T> {
+  const value = (url ?? "").trim()
+  if (!value) return { choice: "auto" as T, customUrl: "" }
+  const match = Object.entries(table).find(([, known]) => known && trimSlash(known) === trimSlash(value))
+  if (match) return { choice: match[0] as T, customUrl: "" }
+  return { choice: "custom" as T, customUrl: value }
+}
+
+/** Reverse-map server-persisted fields to UI choices; unknown URLs become "custom". */
+export function prefsFromServerSources(sources: {
+  pip_index_url?: string | null
+  pytorch_index_url?: string | null
+  hf_endpoint?: string | null
+  github_url_prefix?: string | null
+  proxy_url?: string | null
+} | null): DownloadSourcesPrefs {
+  const prefs = defaultDownloadSources()
+  if (!sources) return prefs
+  prefs.pip = channelFromUrl<PipChoice>(sources.pip_index_url, PIP_URLS)
+  prefs.pytorch = channelFromUrl<PytorchChoice>(sources.pytorch_index_url, PYTORCH_URLS)
+  prefs.huggingface = channelFromUrl<HfChoice>(sources.hf_endpoint, HF_URLS)
+  prefs.github = channelFromUrl<GithubChoice>(sources.github_url_prefix, GITHUB_PREFIXES)
+  prefs.proxy = { url: (sources.proxy_url ?? "").trim() }
+  const china = chinaDownloadSources()
+  const matches = (target: DownloadSourcesPrefs) =>
+    (["pip", "pytorch", "huggingface", "github"] as const).every((key) => prefs[key].choice === target[key].choice)
+  prefs.preset = matches(defaultDownloadSources()) ? "auto" : matches(china) ? "china" : "custom"
+  return prefs
 }

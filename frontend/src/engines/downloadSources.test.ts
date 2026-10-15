@@ -10,8 +10,8 @@ import {
   resolveHfEndpoint,
   resolvePipIndexUrl,
   resolvePytorchIndexUrl,
+  prefsFromServerSources,
   resolvedDownloadSourcesPayload,
-  writeDownloadSources,
 } from "./downloadSources"
 
 afterEach(() => {
@@ -33,14 +33,17 @@ describe("downloadSources", () => {
   })
 
   it("keeps explicit legacy official prefs instead of rewriting them to auto", () => {
-    writeDownloadSources({
-      preset: "official",
-      pip: { choice: "official", customUrl: "" },
-      pytorch: { choice: "official", customUrl: "" },
-      huggingface: { choice: "official", customUrl: "" },
-      github: { choice: "official", customUrl: "" },
-      proxy: { url: "" },
-    })
+    localStorage.setItem(
+      DOWNLOAD_SOURCES_KEY,
+      JSON.stringify({
+        preset: "official",
+        pip: { choice: "official", customUrl: "" },
+        pytorch: { choice: "official", customUrl: "" },
+        huggingface: { choice: "official", customUrl: "" },
+        github: { choice: "official", customUrl: "" },
+        proxy: { url: "" },
+      }),
+    )
     const prefs = readDownloadSources()
     expect(prefs.preset).toBe("official")
     expect(resolvePipIndexUrl(prefs)).toContain("pypi.org")
@@ -80,13 +83,12 @@ describe("downloadSources", () => {
   it("persists custom pip url", () => {
     const prefs = applyPreset("custom", defaultDownloadSources())
     prefs.pip = { choice: "custom", customUrl: "https://example.com/simple" }
-    writeDownloadSources(prefs)
+    localStorage.setItem(DOWNLOAD_SOURCES_KEY, JSON.stringify(prefs))
     expect(resolvePipIndexUrl(readDownloadSources())).toBe("https://example.com/simple")
   })
 
   it("builds install API payload from china preset", () => {
-    writeDownloadSources(chinaDownloadSources())
-    expect(resolvedDownloadSourcesPayload()).toEqual({
+    expect(resolvedDownloadSourcesPayload(chinaDownloadSources())).toEqual({
       pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
       pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
       hf_endpoint: "https://hf-mirror.com",
@@ -141,5 +143,52 @@ describe("downloadSources", () => {
       JSON.stringify({ proxy: { enabled: false, url: "http://127.0.0.1:7890" } }),
     )
     expect(readDownloadSources().proxy).toEqual({ url: "" })
+  })
+})
+
+describe("prefsFromServerSources", () => {
+  it("maps null / empty server state to all-auto defaults", () => {
+    expect(prefsFromServerSources(null)).toEqual(defaultDownloadSources())
+    expect(prefsFromServerSources({})).toEqual(defaultDownloadSources())
+  })
+
+  it("maps the china preset fields back to choices", () => {
+    const prefs = prefsFromServerSources({
+      pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+      pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+      hf_endpoint: "https://hf-mirror.com",
+      github_url_prefix: "https://ghfast.top/",
+      proxy_url: null,
+    })
+    expect(prefs.preset).toBe("china")
+    expect(prefs.pip.choice).toBe("tsinghua")
+    expect(prefs.pytorch.choice).toBe("aliyun")
+    expect(prefs.huggingface.choice).toBe("hf-mirror")
+    expect(prefs.github.choice).toBe("ghfast")
+    expect(prefs.proxy.url).toBe("")
+  })
+
+  it("tolerates trailing slashes when matching known mirrors", () => {
+    const prefs = prefsFromServerSources({ hf_endpoint: "https://hf-mirror.com/" })
+    expect(prefs.huggingface.choice).toBe("hf-mirror")
+  })
+
+  it("maps unknown URLs to custom and marks the preset custom", () => {
+    const prefs = prefsFromServerSources({
+      pip_index_url: "https://pypi.example.com/simple",
+      proxy_url: "http://127.0.0.1:7890",
+    })
+    expect(prefs.pip).toEqual({ choice: "custom", customUrl: "https://pypi.example.com/simple" })
+    expect(prefs.preset).toBe("custom")
+    expect(prefs.proxy.url).toBe("http://127.0.0.1:7890")
+  })
+
+  it("round-trips through resolvedDownloadSourcesPayload", () => {
+    const saved = {
+      pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+      hf_endpoint: "https://hf-mirror.com",
+      proxy_url: "http://127.0.0.1:7890",
+    }
+    expect(resolvedDownloadSourcesPayload(prefsFromServerSources(saved))).toEqual(saved)
   })
 })

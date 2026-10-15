@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from "vue"
+import { computed, onMounted } from "vue"
 import { useI18n } from "vue-i18n"
 import { useRouter } from "vue-router"
-import { DOWNLOAD_SOURCES_CHANGED_EVENT } from "../engines/downloadSources"
 import { useDownloadSourcesStore } from "../stores/downloadSources"
 
 const { t } = useI18n()
@@ -16,15 +15,9 @@ const channels = [
   { key: "github", label: "GitHub" },
 ] as const
 
-function onPrefsChanged() {
-  store.reloadPrefs()
-}
-
 onMounted(() => {
-  store.reloadPrefs()
-  window.addEventListener(DOWNLOAD_SOURCES_CHANGED_EVENT, onPrefsChanged)
+  void store.ensureLoaded()
 })
-onBeforeUnmount(() => window.removeEventListener(DOWNLOAD_SOURCES_CHANGED_EVENT, onPrefsChanged))
 
 const items = computed(() =>
   channels.map((channel) => {

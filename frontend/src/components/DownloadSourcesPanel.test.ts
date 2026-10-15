@@ -4,20 +4,38 @@ import { flushPromises, mount } from "@vue/test-utils"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import DownloadSourcesPanel from "./DownloadSourcesPanel.vue"
 import { i18n } from "../i18n"
-import { DOWNLOAD_SOURCES_KEY, chinaDownloadSources, writeDownloadSources } from "../engines/downloadSources"
+import { DOWNLOAD_SOURCES_KEY } from "../engines/downloadSources"
 
 const checkMock = vi.fn()
+const getMock = vi.fn()
+const saveMock = vi.fn()
 vi.mock("../api/downloadSources", () => ({
-  downloadSourcesApi: { check: (...args: unknown[]) => checkMock(...args) },
+  downloadSourcesApi: {
+    check: (...args: unknown[]) => checkMock(...args),
+    get: () => getMock(),
+    save: (payload: unknown) => saveMock(payload),
+  },
 }))
 
 const OK = { ok: true, status: 200, latency_ms: 88, url: "https://example.com", error: null }
+
+const CHINA_SOURCES = {
+  pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+  pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+  hf_endpoint: "https://hf-mirror.com",
+  github_url_prefix: "https://ghfast.top/",
+  proxy_url: null,
+}
 
 beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.removeItem(DOWNLOAD_SOURCES_KEY)
   checkMock.mockReset()
   checkMock.mockImplementation((_payload: unknown, channel: string) => Promise.resolve({ [channel]: OK }))
+  getMock.mockReset()
+  getMock.mockResolvedValue({ configured: false, sources: null })
+  saveMock.mockReset()
+  saveMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
 })
 
 afterEach(() => {
@@ -34,7 +52,7 @@ function sheetButton(text: string): HTMLButtonElement {
 
 describe("DownloadSourcesPanel connectivity check", () => {
   it("checks the unsaved draft and shows per-channel latency inline", async () => {
-    writeDownloadSources(chinaDownloadSources())
+    getMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
     const wrapper = mount(DownloadSourcesPanel, { attachTo: document.body, global: { plugins: [i18n] } })
     await flushPromises()
 
@@ -69,6 +87,23 @@ describe("DownloadSourcesPanel connectivity check", () => {
 
     expect(checkMock).toHaveBeenCalledTimes(4)
     expect(checkMock).toHaveBeenCalledWith({}, "pip")
+    wrapper.unmount()
+  })
+
+  it("persists the draft to the backend on save", async () => {
+    getMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
+    const wrapper = mount(DownloadSourcesPanel, { attachTo: document.body, global: { plugins: [i18n] } })
+    await flushPromises()
+
+    sheetButton("保存下载源").click()
+    await flushPromises()
+
+    expect(saveMock).toHaveBeenCalledWith({
+      pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+      pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+      hf_endpoint: "https://hf-mirror.com",
+      github_url_prefix: "https://ghfast.top/",
+    })
     wrapper.unmount()
   })
 })
