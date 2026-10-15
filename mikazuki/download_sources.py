@@ -1,12 +1,17 @@
 """Resolved download mirrors for engine installs (Fast / Musubi).
 
-Frontend sends absolute URLs from Settings → Engines download-source prefs.
-CLI / older clients may omit them; installers then keep their previous defaults.
+Source settings persist on the backend (``config/download-sources.local.json``)
+and apply to every install regardless of which client triggers it. Explicit
+payload fields still win for one-off overrides; when neither the payload nor a
+saved config provides a field, installers keep their previous defaults.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
 import re
 from typing import Any
 
@@ -46,6 +51,12 @@ def parse_download_sources(payload: dict | None) -> DownloadSources | None:
         return None
     nested = payload.get("download_sources")
     data = nested if isinstance(nested, dict) else payload
+    return _sources_from_mapping(data)
+
+
+def _sources_from_mapping(data: dict) -> DownloadSources | None:
+    if not isinstance(data, dict):
+        return None
     sources = DownloadSources(
         pip_index_url=_nonempty(data.get("pip_index_url")),
         pytorch_index_url=_nonempty(data.get("pytorch_index_url")),
@@ -56,6 +67,52 @@ def parse_download_sources(payload: dict | None) -> DownloadSources | None:
     if not any(sources.as_dict().values()):
         return None
     return sources
+
+
+def config_path() -> Path:
+    return Path(os.environ.get("NEXT_TRAINER_DOWNLOAD_SOURCES_CONFIG", "config/download-sources.local.json"))
+
+
+def load_download_sources() -> DownloadSources | None:
+    """Read the persisted server-side config; missing/invalid file → None."""
+    path = config_path()
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise ValueError(f"下载源配置文件无效，请修复 {path}。") from None
+    return _sources_from_mapping(data)
+
+
+def save_download_sources(sources: DownloadSources | None) -> None:
+    """Persist the server-side config; None / all-auto removes the file."""
+    path = config_path()
+    if sources is None:
+        path.unlink(missing_ok=True)
+        return
+    payload = {
+        key: value
+        for key, value in {
+            "pip_index_url": sources.pip_index_url,
+            "pytorch_index_url": sources.pytorch_index_url,
+            "hf_endpoint": sources.hf_endpoint,
+            "github_url_prefix": sources.github_url_prefix,
+            "proxy_url": sources.proxy_url,
+        }.items()
+        if value
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def resolve_download_sources(payload: dict | None) -> DownloadSources | None:
+    """Payload fields win; otherwise fall back to the persisted server config.
+
+    Neither present → None, so installers keep their built-in defaults and
+    CLI / older clients behave exactly as before any config was saved.
+    """
+    return parse_download_sources(payload) or load_download_sources()
 
 
 def apply_github_prefix(url: str, prefix: str | None) -> str:
