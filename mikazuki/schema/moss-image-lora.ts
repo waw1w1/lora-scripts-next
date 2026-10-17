@@ -32,7 +32,8 @@ Schema.intersect([
         save_every_epochs: Schema.number().role("number", { integer: true }).min(0).step(1).default(0).description("每 N 个 epoch 保存 / Save every N epochs; 0 = final only / 仅保存最终结果"),
     }).description("保存设置 / Output"),
     Schema.object({
-        epochs: Schema.number().role("number", { integer: true }).min(0).step(1).default(8).description("训练轮数 / Passes over the cached dataset; 0 requires max_steps > 0. 固定 batch size 1，不使用 repeats / Fixed batch size 1, no repeats"),
+        batch_size: Schema.number().role("number", { integer: true }).min(1).max(2).step(1).default(1).description("真实批大小 / Simultaneous images per shape bucket. 保留各 bucket 尾批；不使用梯度累积 / Keep partial tails; accumulation=1"),
+        epochs: Schema.number().role("number", { integer: true }).min(0).step(1).default(8).description("训练轮数 / Passes over the cached dataset; 0 requires max_steps > 0. 按同尺寸 bucket 组 batch，不使用 repeats / Shape-bucket batches, no repeats"),
         max_steps: Schema.number().role("number", { integer: true }).min(0).step(1).default(0).description("步数上限 / Stop after this many steps; 0 = epochs decide / 由轮数决定"),
         rank: Schema.number().role("number", { integer: true }).min(1).max(3072).step(1).default(16).description("LoRA 秩 / LoRA rank"),
         alpha: Schema.number().min(0.000001).step(1).description("LoRA alpha；留空等于 rank / Empty uses rank"),
@@ -42,6 +43,14 @@ Schema.intersect([
         seed: Schema.number().role("number", { integer: true }).min(0).step(1).default(0).description("随机种子 / Random seed"),
         log_every: Schema.number().role("number", { integer: true }).min(1).step(1).default(10).description("完整日志间隔 / Full log line every N steps"),
     }).description("训练与 LoRA / Training and LoRA"),
+    Schema.object({
+        preview_every_epochs: Schema.number().role("number", { integer: true }).min(0).step(1).default(0).description("每 N 轮生成一张预览 / One image every N epochs; 0 disables"),
+        preview_prompt_file: Schema.string().role("filepicker", { type: "file" }).description("固定预览词 TXT / Preview caption TXT; fingerprint fixed at submission"),
+        preview_width: Schema.number().role("number", { integer: true }).min(16).max(2048).step(16).default(1024).description("预览宽度 / Preview width"),
+        preview_height: Schema.number().role("number", { integer: true }).min(16).max(2048).step(16).default(1024).description("预览高度 / Preview height"),
+        preview_steps: Schema.number().role("number", { integer: true }).min(1).max(100).step(1).default(30).description("预览采样步数 / Preview denoising steps"),
+        preview_seed: Schema.number().role("number", { integer: true }).min(0).step(1).default(42).description("固定预览种子 / Same seed for all epochs"),
+    }).description("逐轮预览 / Epoch previews"),
     Schema.object({
         grad_checkpointing: Schema.boolean().default(true).description("梯度检查点 / Per-block activation checkpointing to reduce VRAM use"),
         blocks_to_swap: Schema.number().role("number", { integer: true }).min(-1).max(40).step(1).default(0).description("CPU 交换块数 / DiT blocks swapped to CPU: -1 = auto from free VRAM, 0 = disabled, 1–40 = explicit blocks (at least two blocks remain resident)"),

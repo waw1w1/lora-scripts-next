@@ -19,6 +19,8 @@ def rt(tmp_path, monkeypatch):
     monkeypatch.setattr(environment.sys, "platform", "linux")
     monkeypatch.setattr(environment.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(extension_state, "source_commit", lambda runtime: manifest.UPSTREAM["commit"])
+    from mikazuki.engines.moss import source_integrity
+    monkeypatch.setattr(source_integrity, "verify_source", lambda runtime: {"source_commit": manifest.UPSTREAM["commit"]})
     return Runtime(tmp_path)
 
 

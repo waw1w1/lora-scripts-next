@@ -17,6 +17,8 @@ import sys
 TARGETS = r"layers\.\d+\.proj\.(q|k|v|o|ffn_up_gate|ffn_down)"
 TRAIN_DEFAULTS = {
     "model": "base", "epochs": 8, "max_steps": 0, "rank": 16,
+    "batch_size": 1, "preview_every_epochs": 0, "preview_prompt_file": "",
+    "preview_width": 1024, "preview_height": 1024, "preview_steps": 30, "preview_seed": 42,
     "lr": 1e-4, "warmup_ratio": 0.05, "save_every_epochs": 0,
     "caption_dropout": 0.0, "lora_dtype": "bf16", "targets": TARGETS,
     "sigma_mu": -1.09, "sigma_s": 0.95, "sigma_cutoff": 0.95,
@@ -35,6 +37,9 @@ UI_FIELDS = {
 }
 INT_BOUNDS = {
     "epochs": (0, None), "max_steps": (0, None), "rank": (1, 3072),
+    "batch_size": (1, 2), "preview_every_epochs": (0, None),
+    "preview_width": (16, 2048), "preview_height": (16, 2048),
+    "preview_steps": (1, 100), "preview_seed": (0, 2**63 - 1),
     "save_every_epochs": (0, None), "blocks_to_swap": (-1, 40),
     "log_every": (1, None), "seed": (0, 2**63 - 1),
     "resolution": (16, 4096), "max_text_tokens": (1, 4096),
@@ -170,9 +175,23 @@ def adapt_config(config, runtime):
     if src is not None:
         cache["src"] = str(src)
     train.update(cache=str(cache_dir), model_dir=str(model_dir), output=str(output))
-    warnings = ["MOSS upstream is alpha; real training and ComfyUI LoRA compatibility remain unverified. / MOSS 上游为 alpha，尚未验证真实训练和 ComfyUI LoRA 兼容性。"]
+    train["preview_caption_sha256"] = ""
+    if train["preview_every_epochs"]:
+        if train["blocks_to_swap"] != 0:
+            raise ValueError("preview_every_epochs: previews currently require blocks_to_swap=0")
+        if train["preview_width"] % 16 or train["preview_height"] % 16:
+            raise ValueError("preview_width/height must be multiples of 16")
+        prompt_file = absolute(train["preview_prompt_file"], runtime.project_root)
+        if not train["preview_prompt_file"] or not prompt_file.is_file() or prompt_file.suffix.lower() != ".txt":
+            raise ValueError("preview_prompt_file: choose a local caption TXT")
+        raw = prompt_file.read_bytes()
+        if not raw.decode("utf-8").strip():
+            raise ValueError("preview_prompt_file: caption is empty")
+        train["preview_prompt_file"] = str(prompt_file)
+        train["preview_caption_sha256"] = hashlib.sha256(raw).hexdigest()
+    warnings = ["MOSS upstream is alpha; use matching MOSS model weights. / MOSS 上游为 alpha，请使用对应的 MOSS 模型权重。"]
     if train["epochs"] and train["max_steps"]:
-        warnings.append("max_steps caps epochs × cached pairs; batch size is fixed at 1. / 步数上限截断轮数 × 缓存样本数，批大小固定为 1。")
+        warnings.append("max_steps caps epochs × shape-bucket batches; partial tails are retained. / 步数上限截断轮数 × 同形状批次数，保留尾批。")
     if not run_preprocess:
         warnings.append("External cache headers cannot prove model/caption provenance; only reuse caches for these exact assets. / 外部缓存头不能证明模型和标注来源，请仅复用对应模型的缓存。")
     return AdaptedConfig(cache, train, run_preprocess, warnings)

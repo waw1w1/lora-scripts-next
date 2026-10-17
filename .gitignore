@@ -147,7 +147,7 @@ extensions/diffsynth/
 /qwen-image-2.1-processor/
 /tokenizer-cache/
 
-# Generated frontend assets (existing tracked release assets remain tracked)
+# Generated frontend assets
 /frontend/dist/
 
 # User-owned settings, credentials, presets and task archives.
@@ -156,3 +156,13 @@ extensions/diffsynth/
 # launcher (.NET) build artifacts
 launcher/bin/
 launcher/obj/
+
+# Local verification output
+/junit*.xml
+/pytest*.xml
+/frontend/.vite/
+/frontend/.vitest/
+/frontend/coverage/
+
+# Local MOSS integration notes
+/mikazuki/engines/moss/FIELD_NOTES.md
