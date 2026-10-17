@@ -1,7 +1,7 @@
 """kohya engine routes (mounted at /api/engines/kohya/*)."""
 
 from mikazuki.app.models import APIResponseSuccess, APIResponseFail
-from mikazuki.download_sources import parse_download_sources, DownloadSources
+from mikazuki.download_sources import resolve_download_sources, DownloadSources
 from .settings import runtime
 from .extension_state import read_status
 from .installer import start_install, installation_plan, remove_extension
@@ -26,7 +26,7 @@ async def preflight(config):
 
 async def install(payload, force_install=False):
     rt = runtime()
-    sources = parse_download_sources(payload) or DownloadSources()
+    sources = resolve_download_sources(payload) or DownloadSources()
     if payload.get("dry_run", True):
         return APIResponseSuccess(data={"plan": installation_plan(rt, sources)})
     if not force_install and read_status(rt)["state"] == "ready":

@@ -1,50 +1,109 @@
 // @vitest-environment jsdom
-import { mount } from "@vue/test-utils"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { createPinia, setActivePinia } from "pinia"
+import { flushPromises, mount } from "@vue/test-utils"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import DownloadSourcesPanel from "./DownloadSourcesPanel.vue"
-import {
-  DOWNLOAD_SOURCES_KEY,
-  chinaDownloadSources,
-  defaultDownloadSources,
-  readDownloadSources,
-} from "../engines/downloadSources"
+import { i18n } from "../i18n"
+import { DOWNLOAD_SOURCES_KEY } from "../engines/downloadSources"
 
-vi.mock("vue-i18n", () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-vi.mock("element-plus", () => ({ ElMessage: { success: vi.fn(), error: vi.fn() } }))
+const checkMock = vi.fn()
+const getMock = vi.fn()
+const saveMock = vi.fn()
+vi.mock("../api/downloadSources", () => ({
+  downloadSourcesApi: {
+    check: (...args: unknown[]) => checkMock(...args),
+    get: () => getMock(),
+    save: (payload: unknown) => saveMock(payload),
+  },
+}))
 
-describe("DownloadSourcesPanel", () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
+const OK = { ok: true, status: 200, latency_ms: 88, url: "https://example.com", error: null }
 
-  it("shows a settings card with channel summary when not compact", () => {
-    const wrapper = mount(DownloadSourcesPanel)
-    expect(wrapper.get('[data-testid="download-sources-card"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="download-sources-summary"]').text()).toContain("https://pypi.org/simple")
-    expect(wrapper.get('[data-testid="download-sources-summary"]').text()).toContain("https://huggingface.co")
-    expect(wrapper.find(".ds-compact").exists()).toBe(false)
+const CHINA_SOURCES = {
+  pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+  pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+  hf_endpoint: "https://hf-mirror.com",
+  github_url_prefix: "https://ghfast.top/",
+  proxy_url: null,
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  localStorage.removeItem(DOWNLOAD_SOURCES_KEY)
+  checkMock.mockReset()
+  checkMock.mockImplementation((_payload: unknown, channel: string) => Promise.resolve({ [channel]: OK }))
+  getMock.mockReset()
+  getMock.mockResolvedValue({ configured: false, sources: null })
+  saveMock.mockReset()
+  saveMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
+})
+
+afterEach(() => {
+  document.body.innerHTML = ""
+})
+
+function sheetButton(text: string): HTMLButtonElement {
+  const button = [...document.querySelectorAll<HTMLButtonElement>(".ds-sheet-foot button")].find((b) =>
+    b.textContent?.includes(text),
+  )
+  if (!button) throw new Error(`sheet button not found: ${text}`)
+  return button
+}
+
+describe("DownloadSourcesPanel connectivity check", () => {
+  it("checks the unsaved draft and shows per-channel latency inline", async () => {
+    getMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
+    const wrapper = mount(DownloadSourcesPanel, { attachTo: document.body, global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.find(".ds-inline").exists()).toBe(true)
+    expect(wrapper.find(".ds-modal-backdrop").exists()).toBe(false)
+
+    sheetButton("检测全部源").click()
+    await flushPromises()
+
+    expect(checkMock).toHaveBeenCalledTimes(4)
+    expect(checkMock).toHaveBeenCalledWith(
+      {
+        pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+        pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+        hf_endpoint: "https://hf-mirror.com",
+        github_url_prefix: "https://ghfast.top/",
+      },
+      "pip",
+    )
+    const marks = document.querySelectorAll(".ds-check")
+    expect(marks).toHaveLength(4)
+    expect(document.querySelector('.ds-check[data-status="ok"]')?.textContent).toContain("88 ms")
     wrapper.unmount()
   })
 
-  it("writes the china preset to localStorage when selected", async () => {
-    const wrapper = mount(DownloadSourcesPanel)
-    await wrapper.get('[data-testid="download-sources-preset-china"]').trigger("click")
-    expect(readDownloadSources()).toEqual(chinaDownloadSources())
-    expect(wrapper.get('[data-testid="download-sources-summary"]').text()).toContain("https://hf-mirror.com")
+  it("sends an empty payload for an all-auto draft", async () => {
+    const wrapper = mount(DownloadSourcesPanel, { attachTo: document.body, global: { plugins: [i18n] } })
+    await flushPromises()
+
+    sheetButton("检测全部源").click()
+    await flushPromises()
+
+    expect(checkMock).toHaveBeenCalledTimes(4)
+    expect(checkMock).toHaveBeenCalledWith({}, "pip")
     wrapper.unmount()
   })
 
-  it("keeps only region presets and marks custom via per-channel edits", async () => {
-    localStorage.setItem(DOWNLOAD_SOURCES_KEY, JSON.stringify(defaultDownloadSources()))
-    const wrapper = mount(DownloadSourcesPanel)
-    expect(wrapper.find('[data-testid="download-sources-preset-custom"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="download-sources-channels-toggle"]').trigger("click")
-    await wrapper.get('[data-testid="download-sources-hf"]').setValue("hf-mirror")
-    expect(wrapper.get('[data-testid="download-sources-preset-note"]').attributes("data-custom")).toBe("true")
-    expect(wrapper.get('[data-testid="download-sources-preset-official"]').classes()).not.toContain("selected")
-    await wrapper.get("form.ds-channels-form").trigger("submit")
-    expect(readDownloadSources().preset).toBe("custom")
-    expect(readDownloadSources().huggingface.choice).toBe("hf-mirror")
+  it("persists the draft to the backend on save", async () => {
+    getMock.mockResolvedValue({ configured: true, sources: CHINA_SOURCES })
+    const wrapper = mount(DownloadSourcesPanel, { attachTo: document.body, global: { plugins: [i18n] } })
+    await flushPromises()
+
+    sheetButton("保存下载源").click()
+    await flushPromises()
+
+    expect(saveMock).toHaveBeenCalledWith({
+      pip_index_url: "https://pypi.tuna.tsinghua.edu.cn/simple",
+      pytorch_index_url: "https://mirrors.aliyun.com/pytorch-wheels",
+      hf_endpoint: "https://hf-mirror.com",
+      github_url_prefix: "https://ghfast.top/",
+    })
     wrapper.unmount()
   })
 })

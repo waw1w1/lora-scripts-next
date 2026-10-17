@@ -794,6 +794,11 @@ export default {
         advancedShort: "Advanced",
         close: "Close",
         presets: {
+          auto: {
+            title: "Auto (engine defaults)",
+            hint: "Keep the engine installer's built-in sources",
+            note: "Each channel follows the engine installer default (e.g. Hugging Face → hf-mirror.com). Recommended when unsure.",
+          },
           official: {
             title: "Official",
             hint: "No mirrors; use official endpoints",
@@ -812,7 +817,7 @@ export default {
           },
         },
         advanced: "Per-channel download sources",
-        advancedNote: "The uv-managed Python runtime download is not configurable yet. Domestic PyTorch mirrors may lag or miss builds — fall back to Official if install fails. Do the same if a GitHub proxy is unstable.",
+        advancedNote: "The uv-managed Python runtime download is not configurable yet. Per-channel notes: \"auto\" follows the engine installer (HF defaults to hf-mirror.com); Tsinghua / Aliyun PyPI sync quickly; domestic PyTorch wheels may lag official builds; hf-mirror and ModelScope cover different model sets; GitHub acceleration uses third-party proxies.",
         channels: {
           pip: "pip (PyPI)",
           pytorch: "PyTorch",
@@ -827,6 +832,7 @@ export default {
         },
         choices: {
           pip: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             tsinghua: "Tsinghua TUNA",
             aliyun: "Aliyun",
@@ -834,6 +840,7 @@ export default {
             custom: "Custom URL",
           },
           pytorch: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             aliyun: "Aliyun pytorch-wheels",
             tsinghua: "Tsinghua TUNA pytorch-wheels",
@@ -841,17 +848,29 @@ export default {
             custom: "Custom URL",
           },
           huggingface: {
+            auto: "Auto (engine default: hf-mirror)",
             official: "Official / native",
             "hf-mirror": "hf-mirror.com (recommended)",
             modelscope: "ModelScope HF-compatible endpoint",
             custom: "Custom URL",
           },
           github: {
+            auto: "Auto (engine default)",
             official: "Official / native",
             ghfast: "ghfast.top (recommended)",
             ghproxy: "mirror.ghproxy.com",
             custom: "Custom prefix URL",
           },
+        },
+        engineDefault: "Follows engine default",
+        chipsAria: "Download source connectivity, click to open download source settings",
+        status: {
+          unknown: "Not checked",
+          checking: "Checking",
+          ok: "Reachable",
+          slow: "Slow",
+          fail: "Unreachable",
+          presumedFail: "Timed out, presumed unreachable (still waiting)",
         },
         placeholders: {
           pip: "https://…/simple",
@@ -860,9 +879,17 @@ export default {
           github: "https://mirror.example/https://github.com/",
         },
         save: "Save download sources",
-        reset: "Reset to official",
+        reset: "Reset to auto defaults",
         saved: "Download sources saved",
-        resetDone: "Reset to official defaults",
+        resetDone: "Reset to auto defaults",
+        checkAll: "Check all sources",
+        checking: "Checking…",
+        applyChina: "Apply China preset",
+        proxy: {
+          label: "Network proxy",
+          placeholder: "Leave empty for no proxy; e.g. http://127.0.0.1:7890",
+          hint: "The manual proxy applies to all four channels, including engine installs and connectivity checks. Leave empty for no proxy.",
+        },
       },
       catalog: {
         diffsynth: {
