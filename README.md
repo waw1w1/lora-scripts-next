@@ -15,10 +15,6 @@
 </p>
 
 
-<p align="center">
-  <img src="assets/readme/next-trainer-multi-engine.png" alt="Next Trainer: one interface, multiple training engines" width="960" />
-</p>
-
 ## MOSS-Image training showcase
 
 A **100-step style LoRA test** by [KohakuBlueleaf](https://github.com/KohakuBlueleaf), trained with their [KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer). The top row shows the base model; the bottom row shows the LoRA results. Shared with the author's permission as a MOSS-Image training example; these results were produced with KohakuMossTrainer.

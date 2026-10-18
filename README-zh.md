@@ -15,10 +15,6 @@
 </p>
 
 
-<p align="center">
-  <img src="assets/readme/next-trainer-multi-engine.png" alt="Next Trainer：一个界面，多种训练引擎" width="960" />
-</p>
-
 ## MOSS-Image 训练效果展示
 
 由 [KohakuBlueleaf](https://github.com/KohakuBlueleaf) 使用其训练器 [KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer) 完成的 **100 步风格 LoRA 测试**。上排为基础模型，下排为加载 LoRA 后的效果。经作者同意引用，用于展示 MOSS-Image 的训练效果；本图结果由 KohakuMossTrainer 训练获得。
