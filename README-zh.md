@@ -18,6 +18,12 @@
 
 使用 DiffSynth 引擎训练 Qwen-Image-2.1 LoRA，左侧配置训练，右侧查看 TOML。[从零开始训练 Qwen-Image-2.1](docs/diffsynth.md) · [查看完整界面导览](docs/interface-tour.md)。
 
+## MOSS-Image 训练效果展示
+
+由 [琥珀（KohakuBlueleaf）](https://github.com/KohakuBlueleaf) 使用其训练器 [KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer) 完成的 **100 步风格 LoRA 测试**。上排为基础模型，下排为加载 LoRA 后的效果。经作者同意引用，用于展示 MOSS-Image 的训练效果；本图结果由 KohakuMossTrainer 训练获得。
+
+[![琥珀的 MOSS-Image 基础模型与 100 步风格 LoRA 效果对比](assets/readme/kohaku-moss-style-lora.png)](assets/readme/kohaku-moss-style-lora.png)
+
 ## 3.2.0 更新了什么
 
 - **标签编辑重做**：图片墙优先，选中后才展开编辑面板；提供「标签编辑 / 自由编辑」两种模式、批量操作与历史记录。

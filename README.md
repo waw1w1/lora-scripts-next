@@ -18,6 +18,12 @@
 
 Train Qwen-Image-2.1 LoRA with the DiffSynth engine, with training configuration and TOML preview side by side. [Qwen-Image-2.1 beginner's guide (Chinese)](docs/diffsynth.md) · [Explore the workspace](docs/interface-tour.md).
 
+## MOSS-Image training showcase
+
+A **100-step style LoRA test** by [Kohaku / KohakuBlueleaf](https://github.com/KohakuBlueleaf), trained with their [KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer). The top row shows the base model; the bottom row shows the LoRA results. Shared with the author's permission as a MOSS-Image training example; these results were produced with KohakuMossTrainer.
+
+[![MOSS-Image base model and 100-step style LoRA comparison by Kohaku](assets/readme/kohaku-moss-style-lora.png)](assets/readme/kohaku-moss-style-lora.png)
+
 ## What's new in 3.2.0
 
 - **Caption editor rebuilt:** the image wall leads, the editor panel opens with the selection; tag and free-text modes, batch operations and history.
