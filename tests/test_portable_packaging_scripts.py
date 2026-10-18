@@ -39,6 +39,15 @@ def test_packaged_update_helper_delegates_to_root_updater():
     assert "git pull`r`n" not in script
 
 
+def test_portable_builder_skips_unavailable_offline_marketplace_by_default():
+    script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$SkipMarketplace = -not $IncludeMarketplace" in script
+    assert "pass -IncludeMarketplace to opt in" in script
+
+
 def test_portable_builder_embeds_git_metadata_for_updates():
     script = (ROOT / "build-scripts" / "build_portable.ps1").read_text(
         encoding="utf-8"

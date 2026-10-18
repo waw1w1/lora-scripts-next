@@ -11,7 +11,6 @@ vi.mock("element-plus", async (importOriginal) => {
 vi.mock("./AboutPage.vue", () => ({ default: { template: "<div />" } }))
 vi.mock("./ChangelogPage.vue", () => ({ default: { template: "<div />" } }))
 vi.mock("./EnginesSettingsPage.vue", () => ({ default: { template: "<div />" } }))
-vi.mock("./MarketplaceSettingsPage.vue", () => ({ default: { template: "<div />" } }))
 vi.mock("./UpdateSettingsPage.vue", () => ({ default: { template: "<div />" } }))
 
 import SettingsContainerPage from "./SettingsContainerPage.vue"
@@ -26,7 +25,6 @@ function mountPage() {
         AboutPage: true,
         ChangelogPage: true,
         EnginesSettingsPage: true,
-        MarketplaceSettingsPage: true,
         UpdateSettingsPage: true,
       },
     },
@@ -46,6 +44,12 @@ describe("SettingsContainerPage path picker preference", () => {
     expect(wrapper.get('[data-testid="path-picker-native"]').text()).toBe("Windows")
     expect(wrapper.get('[data-testid="path-picker-auto"]').text()).toContain("推荐")
     expect(wrapper.get('[data-testid="path-picker-auto"]').classes()).not.toContain("active")
+  })
+
+  it("hides the unavailable plugin marketplace from settings navigation", () => {
+    const wrapper = mountPage()
+
+    expect(wrapper.find('a[href="/settings/plugins"]').exists()).toBe(false)
   })
 
   it("saves the selected picker preference with existing UI settings", async () => {
