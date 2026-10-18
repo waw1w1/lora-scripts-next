@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/next-trainer-cover.png" alt="Next Trainer — one interface, multiple training engines" width="960" />
+  <img src="assets/readme/next-trainer-cover.png" alt="Next Trainer — 支持 MOSS 训练" width="720" />
 </p>
 
 <p align="center">
@@ -14,6 +14,10 @@
   <a href="README-zh.md">中文</a>
 </p>
 
+
+<p align="center">
+  <img src="assets/readme/next-trainer-multi-engine.png" alt="Next Trainer: one interface, multiple training engines" width="960" />
+</p>
 
 ## MOSS-Image training showcase
 
