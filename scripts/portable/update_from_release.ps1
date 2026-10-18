@@ -200,10 +200,14 @@ if (-not (Test-Path (Join-Path $stagingTrainer "gui.py"))) {
 
 Write-Step ""
 Write-Step "Merging Next-Trainer / 合并项目文件（保留用户数据）..."
+$kohyaRuntimeDir = Join-Path $TrainerDir "extensions\kohya"
+$hadKohyaRuntime = Test-Path -LiteralPath $kohyaRuntimeDir
 $robocopyArgs = @(
     $stagingTrainer,
     $TrainerDir,
     "/E", "/IS", "/IT", "/R:2", "/W:2", "/NFL", "/NDL", "/NJH", "/NJS", "/NC", "/NS",
+    # User-owned engine environments, including Kohya, must never be merged
+    # from a Release archive.
     "/XD", "extensions", ".cache", "__pycache__", "node_modules", ".vscode", ".cursor",
     "/XD", "config", "sd-models", "output", "logs", "train", "user_data",
     "/XF", (Join-Path $stagingTrainer "assets\config.json")
@@ -211,6 +215,9 @@ $robocopyArgs = @(
 & robocopy @robocopyArgs | Out-Null
 if ($LASTEXITCODE -ge 8) {
     throw "robocopy failed with exit code $LASTEXITCODE"
+}
+if ($hadKohyaRuntime -and -not (Test-Path -LiteralPath $kohyaRuntimeDir)) {
+    throw "Kohya runtime disappeared during Release update: $kohyaRuntimeDir"
 }
 
 $stagingGit = Join-Path $stagingTrainer ".git"
@@ -291,7 +298,7 @@ Write-Step 'Preserved / user data kept:'
 Write-Step '  Next-Trainer\sd-models\  Next-Trainer\output\  Next-Trainer\logs\  Next-Trainer\train\'
 Write-Step '  Next-Trainer\config\  Next-Trainer\assets\config.json'
 Write-Step '  huggingface\  tagger-models\  (portable root)'
-Write-Step '  Next-Trainer\extensions\  (Anima Fast plugin, if installed)'
+Write-Step '  Next-Trainer\extensions\  (Kohya/Musubi/Anima Fast environments preserved)'
 Write-Step ""
 if ($newVersion -and $currentVersion -and ($newVersion -ne $currentVersion -or ($newBuild -and $newBuild -ne $currentBuild))) {
     Write-Step 'If WebUI fails to start, run update\update_dependencies.bat'
