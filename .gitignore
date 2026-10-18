@@ -75,6 +75,11 @@ extensions/anima_lora/source/
 extensions/anima_lora/install_state.json
 .cache/anima_fast/
 
+# User-owned training engine runtimes. Trainer updates must not overwrite or
+# remove an installed engine unless the user explicitly does so.
+/extensions/kohya/
+/extensions/musubi_tuner/
+
 huggingface/hub/models*
 huggingface/hub/version_diffusers_cache.txt
 
