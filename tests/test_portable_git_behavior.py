@@ -272,6 +272,32 @@ class PortableGitBehavior(unittest.TestCase):
         self.assertEqual((self.package / "gui.py").read_bytes(), b"new code\n")
         self.assertEqual(self.git(self.package, "stash", "list"), b"")
 
+    def test_update_preserves_kohya_runtime_during_main_update(self):
+        runtime = self.package / "extensions" / "kohya"
+        self.write(runtime, ".venv/keep-me.bin", b"installed kohya runtime")
+        self.write(runtime, ".python/keep-me.bin", b"installed kohya python")
+        self.write(runtime, "install_state.json", b'{"state":"ready"}')
+
+        self.write(self.source, "gui.py", b"updated main code\n")
+        self.commit("update main code")
+        self.git(self.package, "fetch", "origin", "portable-test", "--deepen=50")
+
+        self.helper("update")
+
+        self.assertEqual((self.package / "gui.py").read_bytes(), b"updated main code\n")
+        self.assertEqual(
+            (runtime / ".venv/keep-me.bin").read_bytes(),
+            b"installed kohya runtime",
+        )
+        self.assertEqual(
+            (runtime / ".python/keep-me.bin").read_bytes(),
+            b"installed kohya python",
+        )
+        self.assertEqual(
+            (runtime / "install_state.json").read_bytes(),
+            b'{"state":"ready"}',
+        )
+
     def test_missing_ignore_does_not_collect_user_data(self):
         (self.package / ".gitignore").unlink()
         self.put_data()
