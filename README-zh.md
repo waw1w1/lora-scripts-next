@@ -35,6 +35,8 @@
 
 ## 支持的训练引擎
 
+![一个前端，多种训练引擎（概念示意图）](assets/readme/next-trainer-multi-engine.png)
+
 **Kohya · Anima Fast · Musubi · AI Toolkit · DiffSynth-Studio · MOSS (anima_lora)**
 
 引擎可在 **设置 → 训练引擎** 中按需安装，再到训练页选择对应引擎。从 3.1.1 或更早版本升级后，首次使用 Kohya 训练前需先安装 Kohya 引擎。可用引擎以所用训练器版本为准；接入引擎不代表已经支持其上游的全部模型和功能。
@@ -45,9 +47,31 @@
 
 ## 支持的模型
 
+![支持的模型概念示意图（非各模型实际输出样张）](assets/readme/next-trainer-models.png)
+
 **MOSS-Image · Qwen-Image-2.1 · Anima · SD 1.5 · SDXL · Flux · FLUX.2 Klein · Krea 2 · Ideogram 4**
 
 不同模型支持的训练目标、硬件要求和引擎安装方式有所区别，详见下方训练教程。
+
+### 模型与训练引擎对应表
+
+✅ 表示已集成的 LoRA 训练入口；— 表示暂无对应入口。此表以当前分支的训练模块为准，不代表上游引擎的全部能力；具体模型版本和硬件要求仍以对应引擎教程为准。
+
+| 模型 | Kohya | Anima Fast | Musubi | AI Toolkit | DiffSynth-Studio | MOSS (anima_lora) |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| MOSS-Image | ✅ | — | — | — | — | ✅ |
+| Qwen-Image-2.1 | — | — | — | ✅ | ✅ | — |
+| Krea 2 | — | — | ✅ | ✅ | — | — |
+| Anima | ✅ | ✅ | — | ✅ | — | — |
+| FLUX.2 Klein | — | — | — | ✅ | — | — |
+| Ideogram 4 | — | — | ✅ | ✅ | — | — |
+| Flux | ✅ | — | — | ✅ | — | — |
+| SDXL | ✅ | — | — | ✅ | — | — |
+| SD 1.5 | ✅ | — | — | ✅ | — | — |
+
+Kohya 还提供 Anima、SDXL、SD 1.5 的全量训练入口。MOSS-Image 默认使用 Kohya，`MOSS (anima_lora)` 为备选。Lumina 保留 Kohya LoRA 入口，可通过 `?model=lumina` 访问，但不在常规模型选择列表中展示。
+
+上方配图均为概念示意，其中画面不代表各标注模型的实际生成效果或评测结果。
 
 ## 训练教程
 
