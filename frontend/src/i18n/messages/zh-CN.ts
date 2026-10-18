@@ -803,6 +803,11 @@ export default {
         advancedShort: "高级设置",
         close: "关闭",
         presets: {
+          auto: {
+            title: "自动（跟随引擎默认）",
+            hint: "不覆盖引擎内置默认源",
+            note: "每个通道由引擎安装器决定（如 Hugging Face 默认 hf-mirror.com）。不确定时推荐。",
+          },
           official: {
             title: "全部官方",
             hint: "不使用任何镜像，直连官网",
@@ -821,7 +826,7 @@ export default {
           },
         },
         advanced: "分项调整下载源",
-        advancedNote: "uv 自带 Python 运行时下载暂不可配。PyTorch 国内源同步可能不全/滞后，失败时请改回官网。GitHub 代理不稳定时也请改回「官网 / 原生」。",
+        advancedNote: "uv 自带 Python 运行时下载暂不可配。通道说明：「自动」由引擎安装器决定（HF 默认 hf-mirror.com）；清华 / 阿里 PyPI 与官网同步较快；国内 PyTorch wheels 可能滞后于官网版本；hf-mirror 与 ModelScope 模型覆盖范围不同；GitHub 加速为第三方代理服务。",
         channels: {
           pip: "pip（PyPI）",
           pytorch: "PyTorch",
@@ -836,6 +841,7 @@ export default {
         },
         choices: {
           pip: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             tsinghua: "清华 TUNA",
             aliyun: "阿里云",
@@ -843,6 +849,7 @@ export default {
             custom: "自定义 URL",
           },
           pytorch: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             aliyun: "阿里云 pytorch-wheels",
             tsinghua: "清华 TUNA pytorch-wheels",
@@ -850,17 +857,29 @@ export default {
             custom: "自定义 URL",
           },
           huggingface: {
+            auto: "自动（引擎默认 hf-mirror）",
             official: "官网 / 原生",
             "hf-mirror": "hf-mirror.com（推荐）",
             modelscope: "ModelScope HF 兼容端点",
             custom: "自定义 URL",
           },
           github: {
+            auto: "自动（引擎默认）",
             official: "官网 / 原生",
             ghfast: "ghfast.top（推荐）",
             ghproxy: "mirror.ghproxy.com",
             custom: "自定义前缀 URL",
           },
+        },
+        engineDefault: "跟随引擎默认",
+        chipsAria: "下载源连通状态，点击打开下载源设置",
+        status: {
+          unknown: "未检测",
+          checking: "检测中",
+          ok: "连通",
+          slow: "较慢",
+          fail: "不可达",
+          presumedFail: "响应超时，判定不可达（仍在等待）",
         },
         placeholders: {
           pip: "https://…/simple",
@@ -869,9 +888,17 @@ export default {
           github: "https://mirror.example/https://github.com/",
         },
         save: "保存下载源",
-        reset: "恢复官方默认",
+        reset: "恢复默认（自动）",
         saved: "下载源已保存",
-        resetDone: "已恢复官方默认",
+        resetDone: "已恢复为自动默认",
+        checkAll: "检测全部源",
+        checking: "检测中…",
+        applyChina: "应用国内加速预设",
+        proxy: {
+          label: "网络代理",
+          placeholder: "留空不使用代理；例如 http://127.0.0.1:7890",
+          hint: "手动代理对四个通道同时生效，包括引擎安装与连通性检测。留空表示不使用代理。",
+        },
       },
       catalog: {
         moss: {

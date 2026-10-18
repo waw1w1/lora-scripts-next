@@ -410,6 +410,76 @@ async def _engine_payload(request: Request) -> dict:
     return json.loads((await request.body()).decode("utf-8") or "{}")
 
 
+def _download_sources_state(sources) -> dict:
+    # Raw values, not the redacted as_dict(): the settings UI round-trips
+    # these fields and redaction would corrupt URL-embedded credentials.
+    return {
+        "configured": sources is not None,
+        "sources": None if sources is None else {
+            "pip_index_url": sources.pip_index_url,
+            "pytorch_index_url": sources.pytorch_index_url,
+            "hf_endpoint": sources.hf_endpoint,
+            "github_url_prefix": sources.github_url_prefix,
+            "proxy_url": sources.proxy_url,
+        },
+    }
+
+
+@router.get("/download-sources")
+async def download_sources_get():
+    from mikazuki.download_sources import load_download_sources
+
+    try:
+        sources = load_download_sources()
+    except ValueError as exc:
+        return APIResponseFail(message=str(exc))
+    return APIResponseSuccess(data=_download_sources_state(sources))
+
+
+@router.put("/download-sources")
+async def download_sources_put(request: Request):
+    from mikazuki.download_sources import parse_download_sources, save_download_sources
+
+    try:
+        payload = json.loads((await request.body()).decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return APIResponseFail(message="invalid JSON body")
+    try:
+        sources = parse_download_sources(payload)
+    except Exception as exc:
+        return APIResponseFail(message=f"invalid download sources: {exc}")
+    for field, value in (
+        ("pip_index_url", sources and sources.pip_index_url),
+        ("pytorch_index_url", sources and sources.pytorch_index_url),
+        ("hf_endpoint", sources and sources.hf_endpoint),
+        ("github_url_prefix", sources and sources.github_url_prefix),
+        ("proxy_url", sources and sources.proxy_url),
+    ):
+        if value and not value.startswith(("http://", "https://")):
+            return APIResponseFail(message=f"{field} must be an http(s) URL")
+    try:
+        save_download_sources(sources)
+    except OSError as exc:
+        return APIResponseFail(message=f"failed to persist download sources: {exc}")
+    return APIResponseSuccess(data=_download_sources_state(sources))
+
+
+@router.post("/download-sources/check")
+async def download_sources_check(request: Request):
+    from mikazuki.download_sources import resolve_download_sources
+    from mikazuki.download_sources_check import CHANNELS, check_download_sources
+
+    try:
+        payload = json.loads((await request.body()).decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    channel = payload.get("channel") if isinstance(payload, dict) else None
+    if channel is not None and channel not in CHANNELS:
+        return APIResponseFail(message=f"unknown download-source channel: {channel}")
+    sources = resolve_download_sources(payload)
+    return APIResponseSuccess(data=await check_download_sources(sources, [channel] if channel else None))
+
+
 @router.get("/engines/{engine_id}/status")
 async def engine_status(engine_id: str):
     return await _engine_routes_module(engine_id).status()

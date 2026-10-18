@@ -6,7 +6,6 @@ import { musubiApi, type MusubiInstallResult, type MusubiStatus } from "./musubi
 import { aiToolkitApi, type AiToolkitInstallResult, type AiToolkitStatus } from "./aiToolkit"
 import { apiData } from "./client"
 import type { EngineRuntimeState } from "../engines/catalog"
-import { resolvedDownloadSourcesPayload } from "../engines/downloadSources"
 import type { TrainingEngine } from "../training/modules"
 
 export interface EngineStatus {
@@ -192,56 +191,55 @@ export const enginesApi = {
   },
 
   async install(id: TrainingEngine): Promise<EngineActionResult> {
-    const downloadSources = resolvedDownloadSourcesPayload()
+    // Download sources come from the server-persisted settings (#310); optional
+    // body fields still win when a caller passes them explicitly.
     if (id === "moss") {
-      const result = await mossApi.install(downloadSources)
+      const result = await mossApi.install()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromMoss(result.status) : undefined }
     }
     if (id === "kohya") {
-      const result = await kohyaApi.install(downloadSources)
+      const result = await kohyaApi.install()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromKohya(result.status) : undefined }
     }
     if (id === "diffsynth") {
-      const result = await diffsynthApi.install(downloadSources)
+      const result = await diffsynthApi.install()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromDiffSynth(result.status) : undefined }
     }
-    if (id === "anima-fast") return fromInstall(await animaFastApi.install(downloadSources))
-    if (id === "musubi") return fromMusubiInstall(await musubiApi.install(downloadSources))
-    if (id === "ai-toolkit") return fromAiToolkitInstall(await aiToolkitApi.install(downloadSources))
+    if (id === "anima-fast") return fromInstall(await animaFastApi.install())
+    if (id === "musubi") return fromMusubiInstall(await musubiApi.install())
+    if (id === "ai-toolkit") return fromAiToolkitInstall(await aiToolkitApi.install())
     throw new Error(`Install is not supported for engine: ${id}`)
   },
 
   async repair(id: TrainingEngine): Promise<EngineActionResult> {
-    const downloadSources = resolvedDownloadSourcesPayload()
     if (id === "moss") {
-      const result = await mossApi.repair(downloadSources)
+      const result = await mossApi.repair()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromMoss(result.status) : undefined }
     }
     if (id === "kohya") {
-      const result = await kohyaApi.repair(downloadSources)
+      const result = await kohyaApi.repair()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromKohya(result.status) : undefined }
     }
     if (id === "diffsynth") {
       // Surgical repair (#462): diagnose and fix the broken component only.
-      const result = await diffsynthApi.repair(downloadSources)
+      const result = await diffsynthApi.repair()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromDiffSynth(result.status) : undefined }
     }
-    if (id === "anima-fast") return fromInstall(await animaFastApi.repair(downloadSources))
-    if (id === "musubi") return fromMusubiInstall(await musubiApi.repair(downloadSources))
-    if (id === "ai-toolkit") return fromAiToolkitInstall(await aiToolkitApi.repair(downloadSources))
+    if (id === "anima-fast") return fromInstall(await animaFastApi.repair())
+    if (id === "musubi") return fromMusubiInstall(await musubiApi.repair())
+    if (id === "ai-toolkit") return fromAiToolkitInstall(await aiToolkitApi.repair())
     throw new Error(`Repair is not supported for engine: ${id}`)
   },
 
   async reinstall(id: TrainingEngine): Promise<EngineActionResult> {
-    const downloadSources = resolvedDownloadSourcesPayload()
     if (id === "diffsynth") {
-      const result = await diffsynthApi.reinstall(downloadSources)
+      const result = await diffsynthApi.reinstall()
       return { alreadyReady: result.already_ready, taskId: result.task_id, logStream: result.log_stream,
         progressStream: result.progress_stream, status: result.status ? fromDiffSynth(result.status) : undefined }
     }
