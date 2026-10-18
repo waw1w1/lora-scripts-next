@@ -16,7 +16,7 @@
 
 ![Qwen-Image-2.1 LoRA training with the DiffSynth engine in Next Trainer](assets/readme/vue3/02-training-qwen-image-21-diffsynth.png)
 
-Train Qwen-Image-2.1 LoRA with the DiffSynth engine, with training configuration and TOML preview side by side. [Qwen-Image-2.1 beginner's guide (Chinese)](docs/diffsynth.md) · [Explore the workspace](docs/interface-tour.md).
+Train Qwen-Image-2.1 LoRA with the DiffSynth engine, with training configuration and TOML preview side by side.
 
 ## MOSS-Image training showcase
 
@@ -30,11 +30,11 @@ A **100-step style LoRA test** by [KohakuBlueleaf](https://github.com/KohakuBlue
 - **Offline Chinese glosses:** a bundled Danbooru dictionary (~330k entries) with dictionary / local model / API sources; the dictionary works fully offline.
 - **Settings restructure:** UI, Training Engines, API, Plugins, Advanced, About; the new **API** page holds shared endpoint and local-model configuration, network and download sources moved under Advanced.
 - **Training task queue:** runs queue automatically, survives a service restart, and failed or stopped tasks can re-enter the queue with their original config.
-- **MOSS-Image LoRA:** MOSS-Image training is available with Kohya as the recommended/default engine; the anima_lora runtime remains an optional secondary path. See the [MOSS-Image guide](docs/MOSS.md).
+- **MOSS-Image LoRA:** MOSS-Image training is available with Kohya as the recommended/default engine; the anima_lora runtime remains an optional secondary path.
 - **Ideogram 4 LoRA on Musubi:** FP8-only, non-commercial weights you fetch yourself (upstream still marks it experimental).
 - **Fixes:** LoKr / LoHa / T-LoRA parameters on the Anima page are no longer reset when reloading or importing a config; the dataset-config preflight now rejects subsets that would be skipped silently.
 
-[Full changelog](CHANGELOG.md) · [Qwen-Image-2.1 guide (Chinese)](docs/diffsynth.md) · [Anima Fast guide](docs/anima-fast.md)
+[Full changelog](CHANGELOG.md)
 
 ## Supported training engines
 
@@ -44,13 +44,25 @@ Install engines from **Settings → Training engines**, then select the appropri
 
 For Qwen-Image-2.1, select **DiffSynth-Studio → LoRA**, then choose **Text-to-image** or **Edit**. Edit currently requires batch size 1 and can use gradient accumulation for a larger effective batch.
 
-For MOSS-Image LoRA, use **Kohya** (recommended and selected by default). **MOSS (anima_lora)** remains available as a secondary engine; setup and model layout details are in the [MOSS-Image guide](docs/MOSS.md).
+For MOSS-Image LoRA, use **Kohya** (recommended and selected by default). **MOSS (anima_lora)** remains available as a secondary engine.
 
 ## Supported models
 
 **MOSS-Image · Qwen-Image-2.1 · Anima · SD 1.5 · SDXL · Flux · FLUX.2 Klein · Krea 2 · Ideogram 4**
 
-Training targets, hardware requirements, and optional engine installation vary by model. See the [training guides](docs/README.md#training--训练).
+Training targets, hardware requirements, and optional engine installation vary by model. See the training tutorials below.
+
+## Training tutorials
+
+- [MOSS-Image](docs/MOSS.md)
+- [Qwen-Image-2.1](docs/diffsynth.md)
+- [Anima](docs/anima-training.md)
+- [Anima Fast](docs/anima-fast.md)
+- [Krea 2 (Linux / multi-GPU)](docs/krea2-linux-multigpu.md)
+- [Ideogram 4 (Musubi)](docs/ideogram4-musubi.md)
+- [TOML / CLI](docs/cli-args.md)
+
+[Interface tour](docs/interface-tour.md) · [Tagger model setup](docs/tagger-models.md) · [Training monitor](docs/train-monitor.md) · [All documentation](docs/README.md)
 
 ## Get started
 
@@ -60,7 +72,6 @@ Training targets, hardware requirements, and optional engine installation vary b
 
 For the 3.2.0 source version or Linux setup, follow [run from source](docs/getting-started.en.md#from-source).
 
-Command-line runs use `scripts/cli/train_anima_by_toml.sh` and `scripts/cli/train_anima_fast_by_toml.sh` to submit Anima / Anima Fast configs; see the [CLI reference](docs/cli-args.md).
 
 ---
 
