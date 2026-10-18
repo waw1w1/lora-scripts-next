@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/next-trainer-cover.png" alt="Next Trainer" width="720" />
+  <img src="assets/readme/next-trainer-cover.png" alt="Next Trainer — one interface, multiple training engines" width="960" />
 </p>
 
 <p align="center">
@@ -14,9 +14,6 @@
   <a href="README.md">English</a>
 </p>
 
-![Next Trainer 训练工作台：使用 DiffSynth 引擎训练 Qwen-Image-2.1 LoRA](assets/readme/vue3/02-training-qwen-image-21-diffsynth.png)
-
-使用 DiffSynth 引擎训练 Qwen-Image-2.1 LoRA，左侧配置训练，右侧查看 TOML。
 
 ## MOSS-Image 训练效果展示
 
