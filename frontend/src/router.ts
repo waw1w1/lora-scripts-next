@@ -34,7 +34,7 @@ const routes: RouteRecordRaw[] = [
   // Update and changelog now live inside the About tab.
   { path: "/settings/update", redirect: "/settings/about" },
   { path: "/settings/changelog", redirect: "/settings/about" },
-  { path: "/settings/plugins", component: SettingsContainerPage, props: { tab: "plugins" }, meta: { titleKey: "marketplace.title" } },
+  { path: "/settings/plugins", redirect: "/settings/advanced" },
   {
     path: "/settings/plugins/:pluginId",
     name: "plugin-settings",

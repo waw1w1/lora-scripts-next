@@ -19,6 +19,9 @@ param(
     # platform package zip so the released one-click package can install the
     # agent plugin offline (no extra download).
     [switch]$SkipMarketplace,
+    # Marketplace assets are not shipped in the repository. Opt in only when
+    # dist-marketplace/catalog.json and trust.json were generated separately.
+    [switch]$IncludeMarketplace,
     # F2-2 catalog-only: bundle ONLY catalog.json + trust.json (KB-sized). The
     # platform zip is then downloaded at install time from the catalog's HTTPS
     # release URL (GitHub release assets), verified against the catalog-pinned
@@ -34,6 +37,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$SkipMarketplace = -not $IncludeMarketplace
 $startTime = Get-Date
 
 $buildDir    = Join-Path $ProjectRoot "build"
@@ -451,7 +455,7 @@ Write-Host "  Done" -ForegroundColor Green
 
 if ($SkipMarketplace) {
     Write-Host ""
-    Write-Host "[2c/6] Skipping plugin marketplace bundle (-SkipMarketplace)" -ForegroundColor Yellow
+    Write-Host "[2c/6] Skipping plugin marketplace (default; pass -IncludeMarketplace to opt in)" -ForegroundColor Yellow
 } else {
     Write-Host ""
     Write-Host "[2c/6] Bundling plugin marketplace (offline plugin install)..." -ForegroundColor Cyan

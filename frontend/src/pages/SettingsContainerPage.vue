@@ -8,7 +8,6 @@ import AdvancedSettingsPage from "./AdvancedSettingsPage.vue"
 import ApiSettingsPage from "./ApiSettingsPage.vue"
 import ChangelogPage from "./ChangelogPage.vue"
 import EnginesSettingsPage from "./EnginesSettingsPage.vue"
-import MarketplaceSettingsPage from "./MarketplaceSettingsPage.vue"
 import UpdateSettingsPage from "./UpdateSettingsPage.vue"
 import { SUPPORTED_LOCALES, UI_CONFIGS_KEY, getStoredLocale, setLocale, type AppLocale } from "../i18n"
 import { getTheme, setTheme, type ThemeName } from "../utils/theme"
@@ -20,7 +19,7 @@ import {
 import { releases } from "../content/releases"
 import { useAppStore } from "../stores/app"
 
-const props = defineProps<{ tab: "ui" | "engines" | "api" | "plugins" | "advanced" | "about" }>()
+const props = defineProps<{ tab: "ui" | "engines" | "api" | "advanced" | "about" }>()
 const { t } = useI18n()
 const appStore = useAppStore()
 const { version } = storeToRefs(appStore)
@@ -45,7 +44,6 @@ const tabs = computed(() => [
   { key: "ui", to: "/settings/ui", label: t("settings.nav.ui") },
   { key: "engines", to: "/settings/engines", label: t("settings.nav.engines") },
   { key: "api", to: "/settings/api", label: t("settings.nav.api") },
-  { key: "plugins", to: "/settings/plugins", label: t("settings.nav.plugins") },
   { key: "advanced", to: "/settings/advanced", label: t("settings.nav.advanced") },
   { key: "about", to: "/settings/about", label: t("settings.nav.about") },
 ] as const)
@@ -151,7 +149,6 @@ function reset() {
         </template>
         <EnginesSettingsPage v-else-if="props.tab === 'engines'" />
         <ApiSettingsPage v-else-if="props.tab === 'api'" />
-        <MarketplaceSettingsPage v-else-if="props.tab === 'plugins'" />
         <AdvancedSettingsPage v-else-if="props.tab === 'advanced'" />
         <template v-else>
           <AboutPage />
