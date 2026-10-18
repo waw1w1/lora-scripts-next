@@ -154,6 +154,17 @@ def test_release_updater_forces_overwrite_for_same_version_republish():
     assert "PORTABLE_BUILD" in release_ps1
 
 
+def test_release_updater_preserves_existing_kohya_engine_environment():
+    release_ps1 = (
+        ROOT / "scripts" / "portable" / "update_from_release.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "Kohya" in release_ps1
+    assert "kohya" in release_ps1
+    assert "must never be merged" in release_ps1
+    assert "Kohya runtime disappeared" in release_ps1
+
+
 def test_portable_verifier_checks_current_user_data_exclusions():
     verifier = (
         ROOT / "scripts" / "portable" / "verify_portable_updaters.ps1"

@@ -84,7 +84,7 @@ Anima LoRA **Fast 模式**使用可选插件 [`sorryhyun/anima_lora`](https://gi
 | lite 7z | **不**预装插件；用户路径：设置 → 训练引擎 / Anima Fast 页内安装 |
 | full 7z | `-BundleAnimaFast` 从维护机已就绪环境复制（含 `.venv`） |
 | 打包排除（默认） | `build-scripts/build_portable.ps1`、`03-copy-project.ps1` 排除整个 `extensions/` |
-| 用户数据 | 用户安装后的 `extensions/anima_lora/` 视为本地数据；Git 更新勿覆盖（`.gitignore` 已忽略 `.venv/`、`source/`） |
+| 用户数据 | 用户安装后的 `extensions/anima_lora/`、`extensions/kohya/`、`extensions/musubi_tuner/` 视为本地数据；Git/Release 更新勿覆盖 |
 | 文档 | [`docs/anima-fast.md`](anima-fast.md)、[`NOTICE.md`](../NOTICE.md) § Anima LoRA Fast Mode |
 
 主 venv（`python_embeded`）仍负责标准 Kohya Anima LoRA / Finetune；Fast 训练**不**占用主 venv。
@@ -141,7 +141,7 @@ Release 更新实现：`Next-Trainer/scripts/portable/update_from_release.ps1`
 1. 通过 GitHub API 获取最新 `Next-Trainer-v*.7z` 资产（兼容旧名 `SD-Trainer-v*.7z`）
 2. 下载到 `update/.cache/`（含 ghfast / ghproxy 镜像回退）
 3. 7-Zip 解压到临时目录
-4. `robocopy` 合并 `Next-Trainer/`（使用 `/IS /IT` 强制覆盖，**不用** `/XO`），排除用户数据目录
+4. `robocopy` 合并 `Next-Trainer/`（使用 `/IS /IT` 强制覆盖，**不用** `/XO`），排除用户数据目录；整个 `Next-Trainer/extensions/`（包括 Kohya、Musubi、Anima Fast 引擎环境）不从 Release 包覆盖。若更新前已有 `extensions/kohya/`，更新后缺失会直接报错，不会伪报成功。
 5. 从 Release 包刷新根目录启动脚本与 `update/` 快捷方式
 6. 写入 `config/.portable_release_sync.json` 记录 Release 资产 id，便于同 VERSION 重发时识别
 
@@ -153,7 +153,7 @@ Release 更新实现：`Next-Trainer/scripts/portable/update_from_release.ps1`
 sd-models/  output/  logs/  train/   # 整合包根：junction，指向 Next-Trainer 内同名目录
 huggingface/  tagger-models/
 Next-Trainer/sd-models/  Next-Trainer/output/  Next-Trainer/logs/  Next-Trainer/train/  # 实际数据
-Next-Trainer/extensions/          # Anima Fast 插件（若已安装）
+Next-Trainer/extensions/          # Kohya/Musubi/Anima Fast 引擎环境（若已安装）
 Next-Trainer/config/autosave/
 Next-Trainer/.cache/
 ```
@@ -298,7 +298,7 @@ fast-forward update failed
 - 运行 `scripts/portable/verify_portable_updaters.ps1 -PortableRoot <构建输出>` 全部 PASS
 - 纯旧 7z、无 `.git`：`Update-Next-Trainer.bat` 引导 Release 更新并失败退出；`Update-Next-Trainer-Release.bat` 可 `-DryRun` 探测 API
 - 新 7z、有 `.git`：`Update-Next-Trainer.bat` 能拉取 `origin/main`
-- **Release 更新**：下载 + 合并后 `VERSION` 更新，`sd-models/`、`extensions/anima_lora/`（若存在）未丢失
+- **Release 更新**：下载 + 合并后 `VERSION` 更新，`sd-models/`、`extensions/kohya/`、`extensions/musubi_tuner/`、`extensions/anima_lora/`（若存在）未丢失
 - **国内无代理网络**：Git 直连失败后自动通过镜像成功拉取；Release 下载镜像回退可用
 - 工作区有用户数据：`sd-models/`、`output/`、`logs/`、`config/` 更新后不丢失
 - 旧包缺少程序文件：自动补齐后更新，模型和训练集留在原处
