@@ -483,12 +483,12 @@ type="button" class="engine-drag-handle" draggable="true"
               <h4>{{ t(card.engine.nameKey) }}</h4>
               <span v-if="isProductDefault(card.engine.id)" class="engine-badge is-default">{{ t("settings.engines.badges.currentDefault") }}</span>
               <span v-if="card.status.state === 'ready'" class="engine-badge is-ready">{{ t("settings.engines.badges.installed") }}</span>
-              <span v-if="card.status.facts?.mode === 'main_env'" class="engine-badge is-default" data-testid="engine-main-env-badge">{{ t("settings.engines.badges.mainEnv") }}</span>
-              <span v-if="card.status.facts?.update_available" class="engine-badge is-update" data-testid="engine-update-badge">{{ t("settings.engines.badges.updateAvailable") }}</span>
               <span v-else-if="['installing', 'auditing'].includes(card.status.state)" class="engine-badge is-busy">{{ t(`settings.engines.state.${card.status.state}`) }}</span>
               <span v-else-if="card.status.state === 'broken'" class="engine-badge is-broken">{{ t("settings.engines.state.broken") }}</span>
               <span v-else class="engine-badge is-missing">{{ t(`settings.engines.state.${card.status.state}`) }}</span>
               <span v-if="card.engine.recommended && !isProductDefault(card.engine.id)" class="engine-badge is-rec">{{ t("settings.engines.badges.recommended") }}</span>
+              <span v-if="card.status.facts?.mode === 'main_env'" class="engine-badge is-default" data-testid="engine-main-env-badge">{{ t("settings.engines.badges.mainEnv") }}</span>
+              <span v-if="card.status.facts?.update_available" class="engine-badge is-update" data-testid="engine-update-badge">{{ t("settings.engines.badges.updateAvailable") }}</span>
             </div>
             <ul class="engine-tags">
               <li v-for="tag in card.engine.tags" :key="tag">{{ t(`settings.engines.tags.${tag}`) }}</li>

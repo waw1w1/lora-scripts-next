@@ -137,6 +137,16 @@ it("offers upgrade in the card menu when pins drifted", async () => {
   expect(item.attributes("disabled")).toBeUndefined()
 })
 
+it("renders exactly one state badge for a ready standalone engine", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "standalone", update_available: false } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const badges = wrapper.get('[data-engine="kohya"] .engine-title-line').findAll(".engine-badge")
+  expect(badges.map((b) => b.text())).toEqual([i18n.global.t("settings.engines.badges.currentDefault"), i18n.global.t("settings.engines.badges.installed")])
+})
+
 it("pages the catalog by five and hides pagination for filtered results", async () => {
   expect((await setup()).find(".engine-pagination").exists()).toBe(true)
   addTestEngines()
