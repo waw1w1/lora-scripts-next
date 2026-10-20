@@ -149,7 +149,31 @@ def test_main_env_audit_failure_cached_briefly(tmp_path, monkeypatch, main_pytho
     read_status(runtime)
     read_status(runtime)
 
-    assert calls == [str(main_python)]
+    # One cache miss; each miss probes isolated first, then with user site.
+    assert calls == [str(main_python), str(main_python)]
+
+
+def test_main_env_audit_retries_with_user_site_only_on_failure(monkeypatch, main_python):
+    calls = []
+
+    def audit(python, allow_user_site=False):
+        calls.append(allow_user_site)
+        return {"ok": True, "gpu": True} if allow_user_site else {"ok": False, "errors": ["no torch"]}
+
+    monkeypatch.setattr(extension_state, "audit_python", audit)
+    result = extension_state.audit_main_env_python(main_python)
+    assert result["ok"] is True
+    assert calls == [False, True]
+
+    calls.clear()
+
+    def audit_ok(python, allow_user_site=False):
+        calls.append(allow_user_site)
+        return {"ok": True, "gpu": True}
+
+    monkeypatch.setattr(extension_state, "audit_python", audit_ok)
+    assert extension_state.audit_main_env_python(main_python)["ok"] is True
+    assert calls == [False]
 
 
 def test_remove_extension_never_touches_main_env(tmp_path, main_python):

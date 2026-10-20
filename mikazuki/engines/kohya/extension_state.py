@@ -38,6 +38,21 @@ _MAIN_ENV_AUDIT_CACHE = {}
 _MAIN_ENV_FAILURE_TTL = 120.0
 
 
+def audit_main_env_python(python):
+    """Match the training launcher's user-site policy (process.py
+    _should_disable_user_site): audit isolated first; only when that fails,
+    retry with user site enabled for pip --user style installs. Enabling user
+    site unconditionally would let ~/.local packages shadow the env's own
+    stack and break otherwise healthy environments.
+    """
+    payload = audit_python(python)
+    if not payload.get("ok"):
+        retry = audit_python(python, allow_user_site=True)
+        if retry.get("ok"):
+            return retry
+    return payload
+
+
 def _cached_main_env_audit(python):
     key = str(python)
     hit = _MAIN_ENV_AUDIT_CACHE.get(key)
@@ -45,7 +60,7 @@ def _cached_main_env_audit(python):
         ok, payload, cached_at = hit
         if ok or time.monotonic() - cached_at < _MAIN_ENV_FAILURE_TTL:
             return payload
-    payload = audit_python(python, allow_user_site=True)
+    payload = audit_main_env_python(python)
     _MAIN_ENV_AUDIT_CACHE[key] = (bool(payload.get("ok")), payload, time.monotonic())
     return payload
 
