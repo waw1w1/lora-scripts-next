@@ -23,7 +23,7 @@ def test_kohya_moss_submission_uses_vendor_launcher_and_safe_defaults(tmp_path, 
 
     runtime = SimpleNamespace(python=tmp_path / "python.exe")
     monkeypatch.setattr(settings, "runtime", lambda: runtime)
-    monkeypatch.setattr(extension_state, "read_status", lambda _runtime: {"state": "ready"})
+    monkeypatch.setattr(extension_state, "read_status", lambda _runtime: {"state": "ready", "runtime": {"python": str(runtime.python)}})
     captured = {}
 
     def fake_run_train(config_path, trainer_file, gpu_ids, cpu_threads, **kwargs):

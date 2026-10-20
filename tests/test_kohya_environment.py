@@ -28,7 +28,7 @@ def test_kohya_install_plan_installs_scipy(tmp_path):
 
 
 def test_kohya_audit_checks_scipy():
-    from mikazuki.engines.kohya.environment import audit_environment
+    from mikazuki.engines.kohya.environment import audit_python
 
-    source = audit_environment.__code__.co_consts
+    source = audit_python.__code__.co_consts
     assert any("scipy" in value for value in source if isinstance(value, str))

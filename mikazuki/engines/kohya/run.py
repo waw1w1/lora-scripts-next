@@ -155,6 +155,6 @@ def handle_run(config: dict, ctx: RunContext):
     result = process.run_train(toml_file, trainer_file, ctx.gpu_ids, suggest_cpu_threads,
                                metadata={"train_type": model_train_type,
                                          "output_name": config.get("output_name")},
-                               python_executable=str(rt.python))
+                               python_executable=status["runtime"]["python"])
 
     return result

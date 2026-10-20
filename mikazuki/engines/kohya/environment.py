@@ -111,13 +111,13 @@ def install_env(runtime):
     return env
 
 
-def audit_environment(runtime):
+def audit_python(python):
     code = (
         "import json, torch, accelerate, transformers, diffusers, scipy; "
         "import lycoris, open_clip; "
         "print(json.dumps({'torch':torch.__version__,'cuda':torch.version.cuda,'gpu':torch.cuda.is_available()}))"
     )
-    result = subprocess.run([str(runtime.python), "-c", code], env=process_env(), text=True, encoding="utf-8", capture_output=True)
+    result = subprocess.run([str(python), "-c", code], env=process_env(), text=True, encoding="utf-8", capture_output=True)
     if result.returncode:
         return {"ok": False, "errors": [result.stderr.strip()]}
     facts = json.loads(result.stdout.strip().splitlines()[-1])
@@ -125,3 +125,7 @@ def audit_environment(runtime):
     if not facts["gpu"]:
         errors.append("未检测到 CUDA GPU，不能启动训练。")
     return {"ok": not errors, "errors": errors, **facts}
+
+
+def audit_environment(runtime):
+    return audit_python(runtime.python)
