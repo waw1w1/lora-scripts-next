@@ -49,7 +49,7 @@ TRAINING_DEPS = [
     "toml==0.10.2",
     "voluptuous==0.13.1",
     "huggingface-hub==1.32.0",
-    "tokenizers==0.22.2",
+    "tokenizers==0.23.1",
     "imagesize==1.4.1",
     "sentencepiece==0.2.0",
     "protobuf==3.20.3",
