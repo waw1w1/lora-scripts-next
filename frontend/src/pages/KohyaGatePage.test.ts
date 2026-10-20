@@ -29,7 +29,7 @@ const installing: EngineStatus = {
   facts: { task_id: "kohya-install-demo" },
 }
 const notInstalled: EngineStatus = { id: "kohya", state: "not_installed", featureEnabled: true }
-const broken: EngineStatus = { id: "kohya", state: "broken", featureEnabled: true, reason: "环境已变化，请修复后重新检查。" }
+const broken: EngineStatus = { id: "kohya", state: "broken", featureEnabled: true, message: "环境已变化，请修复后重新检查。" }
 
 const trainingPageStub = {
   template: '<div class="training-page-stub"><slot name="form-top" /></div>',
