@@ -72,6 +72,16 @@ function addTestEngines() {
   }
 }
 
+it("shows the main-env compat badge when kohya falls back to the main environment", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env", main_env_python: "D:/pack/python_embeded/python.exe" } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const badge = wrapper.get('[data-testid="engine-main-env-badge"]')
+  expect(badge.text()).toBe("主环境兼容")
+})
+
 it("pages the catalog by five and hides pagination for filtered results", async () => {
   expect((await setup()).find(".engine-pagination").exists()).toBe(true)
   addTestEngines()

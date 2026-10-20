@@ -472,6 +472,7 @@ type="button" class="engine-drag-handle" draggable="true"
               <h4>{{ t(card.engine.nameKey) }}</h4>
               <span v-if="isProductDefault(card.engine.id)" class="engine-badge is-default">{{ t("settings.engines.badges.currentDefault") }}</span>
               <span v-if="card.status.state === 'ready'" class="engine-badge is-ready">{{ t("settings.engines.badges.installed") }}</span>
+              <span v-if="card.status.facts?.mode === 'main_env'" class="engine-badge is-default" data-testid="engine-main-env-badge">{{ t("settings.engines.badges.mainEnv") }}</span>
               <span v-else-if="['installing', 'auditing'].includes(card.status.state)" class="engine-badge is-busy">{{ t(`settings.engines.state.${card.status.state}`) }}</span>
               <span v-else-if="card.status.state === 'broken'" class="engine-badge is-broken">{{ t("settings.engines.state.broken") }}</span>
               <span v-else class="engine-badge is-missing">{{ t(`settings.engines.state.${card.status.state}`) }}</span>
@@ -593,6 +594,10 @@ type="button" class="engine-more-btn" data-page="next" :disabled="page === pageC
           <p v-if="runtimePath(manageCard.status)" class="engine-path">
             <span>{{ t("settings.engines.meta.path") }}</span>
             <code>{{ runtimePath(manageCard.status) }}</code>
+          </p>
+          <p v-if="manageCard.status.facts?.mode === 'main_env'" class="engine-path">
+            <span>{{ t("settings.engines.meta.mainEnvPython") }}</span>
+            <code>{{ manageCard.status.facts.main_env_python }}</code>
           </p>
           <div v-if="manageCard.status.state === 'broken'" class="fast-actions" style="margin: 0.75rem 0">
             <button

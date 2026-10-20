@@ -11,6 +11,9 @@ export interface KohyaAudit {
 export interface KohyaFacts {
   task_id?: string
   audit?: KohyaAudit
+  mode?: "standalone" | "main_env"
+  main_env_python?: string
+  main_env_rejected?: { python?: string; errors?: string[] }
 }
 
 export interface KohyaStatus {

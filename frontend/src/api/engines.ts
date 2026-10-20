@@ -8,6 +8,11 @@ import { apiData } from "./client"
 import type { EngineRuntimeState } from "../engines/catalog"
 import type { TrainingEngine } from "../training/modules"
 
+export type EngineFacts = NonNullable<AnimaFastStatus["facts"]> & {
+  mode?: "standalone" | "main_env"
+  main_env_python?: string
+}
+
 export interface EngineStatus {
   id: TrainingEngine
   state: EngineRuntimeState
@@ -23,7 +28,7 @@ export interface EngineStatus {
     toolkitRoot?: string
     externalRuntimeExists?: boolean
   }
-  facts?: AnimaFastStatus["facts"]
+  facts?: EngineFacts
   diagnosis?: DiffSynthStatus["diagnosis"]
   raw?: AnimaFastStatus | MusubiStatus | AiToolkitStatus | DiffSynthStatus | MossStatus
 }

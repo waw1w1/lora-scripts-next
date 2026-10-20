@@ -781,6 +781,7 @@ export default {
         notInstalled: "未安装",
         currentDefault: "当前默认",
         recommended: "推荐",
+        mainEnv: "主环境兼容",
       },
       tags: {
         "moss-image": "MOSS-Image",
@@ -976,6 +977,7 @@ export default {
         gpu: "需要 NVIDIA GPU",
         planned: "尚未开放",
         path: "运行时路径",
+        mainEnvPython: "主环境 Python（旧版兼容）",
         version: "版本",
         updated: "更新",
       },
