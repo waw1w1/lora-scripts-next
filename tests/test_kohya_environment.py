@@ -15,7 +15,7 @@ def test_kohya_training_environment_includes_moss_compatible_stack():
     assert "diffusers[torch]==0.40.0" in TRAINING_DEPS
     assert "safetensors==0.8.0" in TRAINING_DEPS
     assert "huggingface-hub==1.32.0" in TRAINING_DEPS
-    assert "tokenizers==0.22.2" in TRAINING_DEPS
+    assert "tokenizers==0.23.1" in TRAINING_DEPS
 
 
 def test_kohya_install_plan_installs_scipy(tmp_path):
