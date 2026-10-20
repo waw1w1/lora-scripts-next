@@ -30,7 +30,7 @@ def main_python(tmp_path):
 
 def patch_main_env(monkeypatch, python, audit):
     monkeypatch.setattr(extension_state, "main_env_python_candidates", lambda root: [python])
-    monkeypatch.setattr(extension_state, "audit_python", lambda p: audit)
+    monkeypatch.setattr(extension_state, "audit_python", lambda p, **kw: audit)
 
 
 def test_candidates_include_portable_embedded_and_interpreter(tmp_path):
@@ -121,7 +121,7 @@ def test_interrupted_install_falls_back(tmp_path, monkeypatch, main_python):
 def test_main_env_audit_results_are_cached(tmp_path, monkeypatch, main_python):
     calls = []
 
-    def audit(python):
+    def audit(python, **kw):
         calls.append(str(python))
         return {"ok": True, "gpu": True}
 
@@ -138,7 +138,7 @@ def test_main_env_audit_results_are_cached(tmp_path, monkeypatch, main_python):
 def test_main_env_audit_failure_cached_briefly(tmp_path, monkeypatch, main_python):
     calls = []
 
-    def audit(python):
+    def audit(python, **kw):
         calls.append(str(python))
         return {"ok": False, "errors": ["no torch"]}
 

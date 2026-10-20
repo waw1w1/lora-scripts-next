@@ -45,7 +45,7 @@ def _cached_main_env_audit(python):
         ok, payload, cached_at = hit
         if ok or time.monotonic() - cached_at < _MAIN_ENV_FAILURE_TTL:
             return payload
-    payload = audit_python(python)
+    payload = audit_python(python, allow_user_site=True)
     _MAIN_ENV_AUDIT_CACHE[key] = (bool(payload.get("ok")), payload, time.monotonic())
     return payload
 

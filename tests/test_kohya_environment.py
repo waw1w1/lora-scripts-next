@@ -154,3 +154,10 @@ def test_moss_stack_error_gates_transformers_major():
     assert "transformers 5.x" in moss_stack_error({"transformers": "garbage"})
     assert "transformers 5.x" in moss_stack_error({})
     assert "transformers 5.x" in moss_stack_error(None)
+
+
+def test_moss_stack_error_prefers_qwen35_capability_flag():
+    from mikazuki.engines.kohya.environment import moss_stack_error
+
+    assert moss_stack_error({"transformers": "4.51.3", "qwen35": True}) is None
+    assert "transformers 5.x" in moss_stack_error({"transformers": "5.17.0", "qwen35": False})

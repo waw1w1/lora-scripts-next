@@ -1,5 +1,7 @@
 """kohya engine routes (mounted at /api/engines/kohya/*)."""
 
+import asyncio
+
 from mikazuki.app.models import APIResponseSuccess, APIResponseFail
 from mikazuki.download_sources import resolve_download_sources, DownloadSources
 from .settings import runtime
@@ -10,7 +12,9 @@ from .preflight import check_runtime
 
 
 async def status():
-    data = read_status(runtime())
+    # A cache-miss fallback audit spawns a python subprocess importing torch;
+    # keep that off the event loop.
+    data = await asyncio.to_thread(read_status, runtime())
     data["train_types"] = sorted(TRAIN_TYPES)
     return APIResponseSuccess(data=data)
 
@@ -18,7 +22,7 @@ async def status():
 async def preflight(config):
     try:
         rt = runtime()
-        check_runtime(rt)
+        await asyncio.to_thread(check_runtime, rt)
         return APIResponseSuccess(data={"ok": True, "errors": [], "warnings": [], "facts": {}})
     except (ValueError, OSError) as exc:
         return APIResponseFail(message=str(exc), data={"ok": False, "errors": [str(exc)]})
@@ -29,8 +33,9 @@ async def install(payload, force_install=False):
     sources = resolve_download_sources(payload) or DownloadSources()
     if payload.get("dry_run", True):
         return APIResponseSuccess(data={"plan": installation_plan(rt, sources)})
-    if not force_install and read_status(rt)["state"] == "ready":
-        return APIResponseSuccess(data={"already_ready": True, "status": read_status(rt)})
+    current = await asyncio.to_thread(read_status, rt)
+    if not force_install and current["state"] == "ready":
+        return APIResponseSuccess(data={"already_ready": True, "status": current})
     try:
         return APIResponseSuccess(data=start_install(rt, sources, repair=force_install))
     except ValueError as exc:
@@ -46,7 +51,7 @@ async def upgrade(payload):
     only installs packages that violate the current pins. Works for both the
     standalone venv and a legacy main environment."""
     rt = runtime()
-    status = read_status(rt)
+    status = await asyncio.to_thread(read_status, rt)
     if status["state"] != "ready":
         return APIResponseFail(message="环境未就绪，无法增量升级；请先安装或修复。")
     drift = status["facts"].get("drift") or []
@@ -66,6 +71,6 @@ async def upgrade(payload):
 async def uninstall():
     try:
         remove_extension(runtime())
-        return APIResponseSuccess(data={"status": read_status(runtime())})
+        return APIResponseSuccess(data={"status": await asyncio.to_thread(read_status, runtime())})
     except (ValueError, OSError) as exc:
         return APIResponseFail(message=str(exc))

@@ -178,26 +178,40 @@ MOSS_MIN_TRANSFORMERS_MAJOR = 5
 
 
 def moss_stack_error(audit_facts):
-    version = str((audit_facts or {}).get("transformers") or "")
-    try:
-        major = int(version.split(".")[0])
-    except (ValueError, IndexError):
-        major = 0
-    if major < MOSS_MIN_TRANSFORMERS_MAJOR:
-        return "MOSS-Image 需要 transformers 5.x（Qwen3.5 文本编码器）；当前训练环境版本过旧，请到训练引擎管理中安装/修复 kohya 独立环境。"
-    return None
+    facts = audit_facts or {}
+    if "qwen35" in facts:
+        if facts["qwen35"]:
+            return None
+    else:
+        version = str(facts.get("transformers") or "")
+        try:
+            major = int(version.split(".")[0])
+        except (ValueError, IndexError):
+            major = 0
+        if major >= MOSS_MIN_TRANSFORMERS_MAJOR:
+            return None
+    return "MOSS-Image 需要 transformers 5.x（Qwen3.5 文本编码器）；当前训练环境版本过旧，请到训练引擎管理中安装/修复 kohya 独立环境。"
 
 
-def audit_python(python):
+def audit_python(python, allow_user_site=False):
     code = (
         "import json, torch, accelerate, transformers, diffusers, scipy; "
         "import lycoris, open_clip, tokenizers; "
         "import importlib.metadata as im; "
         "vs={}; [vs.__setitem__(n, d.version) for d in im.distributions() if (n := d.metadata.get('Name'))]; "
         "print(json.dumps({'torch':torch.__version__,'cuda':torch.version.cuda,'gpu':torch.cuda.is_available(),"
-        "'transformers':transformers.__version__,'tokenizers':tokenizers.__version__,'versions':vs}))"
+        "'transformers':transformers.__version__,'tokenizers':tokenizers.__version__,'versions':vs,"
+        "'qwen35':hasattr(transformers,'Qwen3_5TextConfig')}))"
     )
-    result = subprocess.run([str(python), "-c", code], env=process_env(), text=True, encoding="utf-8", capture_output=True)
+    env = process_env()
+    if allow_user_site:
+        # Training launchers honor pip --user installs on the main
+        # environment; the fallback audit must see the same packages.
+        env.pop("PYTHONNOUSERSITE", None)
+    try:
+        result = subprocess.run([str(python), "-c", code], env=env, text=True, encoding="utf-8", capture_output=True, timeout=300)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"ok": False, "errors": [f"审计子进程无法执行或超时: {exc}"]}
     if result.returncode:
         return {"ok": False, "errors": [result.stderr.strip()]}
     facts = json.loads(result.stdout.strip().splitlines()[-1])
