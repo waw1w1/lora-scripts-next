@@ -998,6 +998,7 @@ export default {
         repair: "The runtime will be diagnosed and only damaged components will be repaired (for example recreating the venv or source). This does not wipe the whole runtime by default. Continue?",
         reinstall: "Full reinstall deletes the standalone Python, venv, and source, then reinstalls everything (usually several GB). Use only when Repair fails. Continue?",
         uninstall: "Uninstall will remove the standalone runtime. Continue?",
+        uninstallMainEnv: "Currently running on the main environment (legacy compat). Uninstall only removes the standalone runtime directory; the main environment cannot be deleted and stays untouched. Continue?",
       },
       msg: {
         ready: "Engine ready",

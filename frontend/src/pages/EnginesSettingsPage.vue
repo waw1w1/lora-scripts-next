@@ -288,7 +288,12 @@ async function install(engineId: TrainingEngine, mode: "install" | "repair" | "r
 async function uninstall(engineId: TrainingEngine) {
   menuId.value = null
   try {
-    await ElMessageBox.confirm(t("settings.engines.confirm.uninstall"), t("settings.engines.actions.uninstall"), { type: "warning" })
+    const mainEnv = statuses.value[engineId]?.facts?.mode === "main_env"
+    await ElMessageBox.confirm(
+      t(mainEnv ? "settings.engines.confirm.uninstallMainEnv" : "settings.engines.confirm.uninstall"),
+      t("settings.engines.actions.uninstall"),
+      { type: "warning" },
+    )
     loadingId.value = engineId
     const status = await enginesApi.uninstall(engineId)
     statuses.value = { ...statuses.value, [engineId]: status }

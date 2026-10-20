@@ -82,6 +82,22 @@ it("shows the main-env compat badge when kohya falls back to the main environmen
   expect(badge.text()).toBe("主环境兼容")
 })
 
+it("uninstall in main-env mode discloses only the standalone runtime is removed", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env" } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as MessageBoxData)
+  vi.spyOn(ElMessage, "success").mockImplementation(() => ({ close: vi.fn() }))
+  vi.mocked(enginesApi.uninstall).mockResolvedValue({ id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env" } })
+  await wrapper.get('[data-engine="kohya"] .engine-more-btn').trigger("click")
+  await wrapper.get('[data-engine="kohya"] .engine-more-menu .is-danger').trigger("click")
+  await flushPromises()
+  expect(confirm).toHaveBeenCalledWith(i18n.global.t("settings.engines.confirm.uninstallMainEnv"), expect.anything(), expect.anything())
+  expect(enginesApi.uninstall).toHaveBeenCalledWith("kohya")
+})
+
 it("pages the catalog by five and hides pagination for filtered results", async () => {
   expect((await setup()).find(".engine-pagination").exists()).toBe(true)
   addTestEngines()
