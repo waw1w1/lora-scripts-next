@@ -8,6 +8,13 @@ import { apiData } from "./client"
 import type { EngineRuntimeState } from "../engines/catalog"
 import type { TrainingEngine } from "../training/modules"
 
+export type EngineFacts = NonNullable<AnimaFastStatus["facts"]> & {
+  mode?: "standalone" | "main_env"
+  main_env_python?: string
+  update_available?: boolean
+  drift?: { name: string; spec: string; installed?: string | null }[]
+}
+
 export interface EngineStatus {
   id: TrainingEngine
   state: EngineRuntimeState
@@ -23,7 +30,7 @@ export interface EngineStatus {
     toolkitRoot?: string
     externalRuntimeExists?: boolean
   }
-  facts?: AnimaFastStatus["facts"]
+  facts?: EngineFacts
   diagnosis?: DiffSynthStatus["diagnosis"]
   raw?: AnimaFastStatus | MusubiStatus | AiToolkitStatus | DiffSynthStatus | MossStatus
 }
@@ -245,6 +252,15 @@ export const enginesApi = {
     }
     // Other engines: reinstall currently aliases force-repair.
     return this.repair(id)
+  },
+
+  async upgrade(id: TrainingEngine): Promise<EngineActionResult> {
+    if (id === "kohya") {
+      const result = await kohyaApi.upgrade()
+      return { alreadyReady: result.already_up_to_date, taskId: result.task_id, logStream: result.log_stream,
+        progressStream: result.progress_stream, status: result.status ? fromKohya(result.status) : undefined }
+    }
+    throw new Error(`Upgrade is not supported for engine: ${id}`)
   },
 
   async uninstall(id: TrainingEngine): Promise<EngineStatus> {

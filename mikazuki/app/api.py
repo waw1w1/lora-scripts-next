@@ -544,6 +544,15 @@ async def engine_repair(engine_id: str, request: Request):
     return await handler(await _engine_payload(request))
 
 
+@router.post("/engines/{engine_id}/upgrade")
+async def engine_upgrade(engine_id: str, request: Request):
+    routes = _engine_routes_module(engine_id)
+    handler = getattr(routes, "upgrade", None)
+    if handler is None:
+        return APIResponseFail(message=f"{engine_id} 插件未提供升级接口。")
+    return await handler(await _engine_payload(request))
+
+
 @router.post("/engines/{engine_id}/uninstall")
 async def engine_uninstall(engine_id: str):
     pack = registry.get_pack(engine_id)

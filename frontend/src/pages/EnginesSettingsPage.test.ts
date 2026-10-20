@@ -13,7 +13,7 @@ let server: UserSettings
 const settingsFetch = vi.fn()
 
 vi.mock("../api/engines", () => ({
-  enginesApi: { list: vi.fn(), install: vi.fn(), repair: vi.fn(), reinstall: vi.fn(), uninstall: vi.fn() },
+  enginesApi: { list: vi.fn(), install: vi.fn(), repair: vi.fn(), reinstall: vi.fn(), uninstall: vi.fn(), upgrade: vi.fn() },
 }))
 const statuses: EngineStatus[] = [
   { id: "kohya", state: "not_installed", featureEnabled: true },
@@ -71,6 +71,81 @@ function addTestEngines() {
     ;(ENGINE_CATALOG as EngineDefinition[]).push({ ...ENGINE_CATALOG[0]!, id: id as EngineDefinition["id"] })
   }
 }
+
+it("shows the main-env compat badge when kohya falls back to the main environment", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env", main_env_python: "D:/pack/python_embeded/python.exe" } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const badge = wrapper.get('[data-testid="engine-main-env-badge"]')
+  expect(badge.text()).toBe("主环境兼容")
+})
+
+it("uninstall in main-env mode discloses only the standalone runtime is removed", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env" } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as MessageBoxData)
+  vi.spyOn(ElMessage, "success").mockImplementation(() => ({ close: vi.fn() }))
+  vi.mocked(enginesApi.uninstall).mockResolvedValue({ id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "main_env" } })
+  await wrapper.get('[data-engine="kohya"] .engine-more-btn').trigger("click")
+  await wrapper.get('[data-engine="kohya"] .engine-more-menu .is-danger').trigger("click")
+  await flushPromises()
+  expect(confirm).toHaveBeenCalledWith(i18n.global.t("settings.engines.confirm.uninstallMainEnv"), expect.anything(), expect.anything())
+  expect(enginesApi.uninstall).toHaveBeenCalledWith("kohya")
+})
+
+it("shows pin drift with version detail and offers incremental upgrade", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true,
+      facts: { mode: "standalone", update_available: true, drift: [{ name: "transformers", spec: "==5.17.0", installed: "4.51.3" }] } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  expect(wrapper.get('[data-testid="engine-update-badge"]').text()).toBe("建议升级")
+
+  await wrapper.get('[data-engine="kohya"] .engine-primary').trigger("click")
+  await flushPromises()
+  const drift = document.querySelector('[data-testid="engine-drift"]')
+  expect(drift).not.toBeNull()
+  expect(drift!.textContent).toContain("transformers")
+  expect(drift!.textContent).toContain("4.51.3")
+  expect(drift!.textContent).toContain("==5.17.0")
+
+  const confirm = vi.spyOn(ElMessageBox, "confirm").mockResolvedValue("confirm" as MessageBoxData)
+  vi.spyOn(ElMessage, "success").mockImplementation(() => ({ close: vi.fn() }))
+  vi.mocked(enginesApi.upgrade).mockResolvedValue({ alreadyReady: true, status: { id: "kohya", state: "ready", featureEnabled: true } })
+  ;(document.querySelector('[data-testid="engine-upgrade"]') as HTMLElement).click()
+  await flushPromises()
+  expect(confirm).toHaveBeenCalledWith(i18n.global.t("settings.engines.confirm.upgrade"), expect.anything(), expect.anything())
+  expect(enginesApi.upgrade).toHaveBeenCalledWith("kohya")
+})
+
+it("offers upgrade in the card menu when pins drifted", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true,
+      facts: { mode: "main_env", update_available: true, drift: [{ name: "transformers", spec: "==5.17.0", installed: "4.51.3" }] } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  await wrapper.get('[data-engine="kohya"] .engine-more-btn').trigger("click")
+  const item = wrapper.get('[data-testid="engine-menu-upgrade"]')
+  expect(item.text()).toBe("升级环境")
+  expect(item.attributes("disabled")).toBeUndefined()
+})
+
+it("renders exactly one state badge for a ready standalone engine", async () => {
+  vi.mocked(enginesApi.list).mockResolvedValue([
+    { id: "kohya", state: "ready", featureEnabled: true, facts: { mode: "standalone", update_available: false } },
+    ...statuses.filter((s) => s.id !== "kohya"),
+  ])
+  const wrapper = await setup()
+  const badges = wrapper.get('[data-engine="kohya"] .engine-title-line').findAll(".engine-badge")
+  expect(badges.map((b) => b.text())).toEqual([i18n.global.t("settings.engines.badges.currentDefault"), i18n.global.t("settings.engines.badges.installed")])
+})
 
 it("pages the catalog by five and hides pagination for filtered results", async () => {
   expect((await setup()).find(".engine-pagination").exists()).toBe(true)

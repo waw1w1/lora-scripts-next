@@ -239,7 +239,7 @@ async function refresh(reportError = true) {
   }
 }
 
-async function install(engineId: TrainingEngine, mode: "install" | "repair" | "reinstall" = "install") {
+async function install(engineId: TrainingEngine, mode: "install" | "repair" | "reinstall" | "upgrade" = "install") {
   menuId.value = null
   try {
     const confirmKey =
@@ -247,13 +247,17 @@ async function install(engineId: TrainingEngine, mode: "install" | "repair" | "r
         ? "settings.engines.confirm.reinstall"
         : mode === "repair"
           ? "settings.engines.confirm.repair"
-          : `settings.engines.confirm.install.${engineId}`
+          : mode === "upgrade"
+            ? "settings.engines.confirm.upgrade"
+            : `settings.engines.confirm.install.${engineId}`
     const titleKey =
       mode === "reinstall"
         ? "settings.engines.actions.reinstall"
         : mode === "repair"
           ? "settings.engines.actions.repair"
-          : "settings.engines.actions.install"
+          : mode === "upgrade"
+            ? "settings.engines.actions.upgrade"
+            : "settings.engines.actions.install"
     await ElMessageBox.confirm(t(confirmKey), t(titleKey), { type: "warning" })
     loadingId.value = engineId
     logs.value = []
@@ -264,7 +268,9 @@ async function install(engineId: TrainingEngine, mode: "install" | "repair" | "r
         ? await enginesApi.reinstall(engineId)
         : mode === "repair"
           ? await enginesApi.repair(engineId)
-          : await enginesApi.install(engineId)
+          : mode === "upgrade"
+            ? await enginesApi.upgrade(engineId)
+            : await enginesApi.install(engineId)
     if (result.alreadyReady) {
       if (result.status) statuses.value = { ...statuses.value, [engineId]: result.status }
       ElMessage.success(t("settings.engines.msg.ready"))
@@ -288,7 +294,12 @@ async function install(engineId: TrainingEngine, mode: "install" | "repair" | "r
 async function uninstall(engineId: TrainingEngine) {
   menuId.value = null
   try {
-    await ElMessageBox.confirm(t("settings.engines.confirm.uninstall"), t("settings.engines.actions.uninstall"), { type: "warning" })
+    const mainEnv = statuses.value[engineId]?.facts?.mode === "main_env"
+    await ElMessageBox.confirm(
+      t(mainEnv ? "settings.engines.confirm.uninstallMainEnv" : "settings.engines.confirm.uninstall"),
+      t("settings.engines.actions.uninstall"),
+      { type: "warning" },
+    )
     loadingId.value = engineId
     const status = await enginesApi.uninstall(engineId)
     statuses.value = { ...statuses.value, [engineId]: status }
@@ -476,6 +487,8 @@ type="button" class="engine-drag-handle" draggable="true"
               <span v-else-if="card.status.state === 'broken'" class="engine-badge is-broken">{{ t("settings.engines.state.broken") }}</span>
               <span v-else class="engine-badge is-missing">{{ t(`settings.engines.state.${card.status.state}`) }}</span>
               <span v-if="card.engine.recommended && !isProductDefault(card.engine.id)" class="engine-badge is-rec">{{ t("settings.engines.badges.recommended") }}</span>
+              <span v-if="card.status.facts?.mode === 'main_env'" class="engine-badge is-default" data-testid="engine-main-env-badge">{{ t("settings.engines.badges.mainEnv") }}</span>
+              <span v-if="card.status.facts?.update_available" class="engine-badge is-update" data-testid="engine-update-badge">{{ t("settings.engines.badges.updateAvailable") }}</span>
             </div>
             <ul class="engine-tags">
               <li v-for="tag in card.engine.tags" :key="tag">{{ t(`settings.engines.tags.${tag}`) }}</li>
@@ -532,6 +545,15 @@ type="button" class="engine-drag-handle" draggable="true"
                   @click="install(card.engine.id, 'repair')"
                 >
                   {{ t("settings.engines.actions.repair") }}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="engine-menu-upgrade"
+                  :disabled="loadingId === card.engine.id || !card.status.facts?.update_available"
+                  @click="install(card.engine.id, 'upgrade')"
+                >
+                  {{ t("settings.engines.actions.upgrade") }}
                 </button>
                 <button
                   type="button"
@@ -594,6 +616,27 @@ type="button" class="engine-more-btn" data-page="next" :disabled="page === pageC
             <span>{{ t("settings.engines.meta.path") }}</span>
             <code>{{ runtimePath(manageCard.status) }}</code>
           </p>
+          <p v-if="manageCard.status.facts?.mode === 'main_env'" class="engine-path">
+            <span>{{ t("settings.engines.meta.mainEnvPython") }}</span>
+            <code>{{ manageCard.status.facts.main_env_python }}</code>
+          </p>
+          <div v-if="manageCard.status.facts?.update_available" class="engine-drift" data-testid="engine-drift">
+            <p>{{ t("settings.engines.meta.drift") }}</p>
+            <ul>
+              <li v-for="entry in manageCard.status.facts.drift" :key="entry.name">
+                <code>{{ entry.name }}</code>: {{ entry.installed ?? t("settings.engines.meta.driftMissing") }} → {{ entry.spec }}
+              </li>
+            </ul>
+            <button
+              type="button"
+              class="primary-action"
+              data-testid="engine-upgrade"
+              :disabled="loadingId === manageCard.engine.id"
+              @click="install(manageCard.engine.id, 'upgrade')"
+            >
+              {{ t("settings.engines.actions.upgrade") }}
+            </button>
+          </div>
           <div v-if="manageCard.status.state === 'broken'" class="fast-actions" style="margin: 0.75rem 0">
             <button
               type="button"
