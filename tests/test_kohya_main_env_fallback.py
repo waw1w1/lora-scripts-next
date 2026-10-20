@@ -163,3 +163,133 @@ def test_remove_extension_never_touches_main_env(tmp_path, main_python):
 
     assert not runtime.root.exists()
     assert main_python.is_file()
+
+
+def _make_dist_info(runtime, name, version):
+    meta = runtime.root / ".venv" / "lib" / "python3.10" / "site-packages" / f"{name}-{version}.dist-info" / "METADATA"
+    meta.parent.mkdir(parents=True, exist_ok=True)
+    meta.write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n", encoding="utf-8")
+
+
+def _make_ready_standalone(runtime):
+    runtime.python.parent.mkdir(parents=True, exist_ok=True)
+    runtime.python.write_text("fake", encoding="utf-8")
+    write_state(runtime, "ready", {"fingerprint": "whatever"})
+
+
+def test_standalone_ready_with_drift_reports_update_available(tmp_path):
+    runtime = Runtime(tmp_path)
+    _make_ready_standalone(runtime)
+    _make_dist_info(runtime, "transformers", "4.51.3")
+
+    status = read_status(runtime)
+
+    assert status["state"] == "ready"
+    assert status["facts"]["mode"] == "standalone"
+    assert status["facts"]["update_available"] is True
+    drift = {d["name"]: d for d in status["facts"]["drift"]}
+    assert drift["transformers"]["installed"] == "4.51.3"
+    assert drift["transformers"]["spec"] == "==5.17.0"
+
+
+def test_standalone_ready_without_drift_is_clean(tmp_path, monkeypatch):
+    runtime = Runtime(tmp_path)
+    _make_ready_standalone(runtime)
+    monkeypatch.setattr(extension_state, "compute_drift", lambda versions: [])
+
+    status = read_status(runtime)
+
+    assert status["state"] == "ready"
+    assert status["facts"]["update_available"] is False
+    assert "drift" not in status["facts"]
+
+
+def test_main_env_ready_reports_drift_from_audit_versions(tmp_path, monkeypatch, main_python):
+    patch_main_env(monkeypatch, main_python, {"ok": True, "gpu": True, "versions": {"transformers": "4.51.3", "torch": "2.13.0+cu130"}})
+
+    status = read_status(Runtime(tmp_path / "Next-Trainer"))
+
+    assert status["state"] == "ready"
+    assert status["facts"]["mode"] == "main_env"
+    assert status["facts"]["update_available"] is True
+    drift = {d["name"]: d for d in status["facts"]["drift"]}
+    assert drift["transformers"]["installed"] == "4.51.3"
+
+
+def test_main_env_upgrade_marker_drives_installing_state(tmp_path, monkeypatch, main_python):
+    from mikazuki.tasks import tm, TaskStatus
+    from types import SimpleNamespace
+
+    patch_main_env(monkeypatch, main_python, {"ok": True, "gpu": True, "versions": {}})
+    runtime = Runtime(tmp_path / "Next-Trainer")
+    task_id = "kohya-install-upgrade-demo"
+    tm.tasks[task_id] = SimpleNamespace(status=TaskStatus.RUNNING)
+    try:
+        extension_state.note_main_env_upgrade(main_python, task_id)
+        status = read_status(runtime)
+        assert status["state"] == "installing"
+        assert status["facts"]["task_id"] == task_id
+
+        tm.tasks[task_id].status = TaskStatus.FINISHED
+        status = read_status(runtime)
+        assert status["state"] == "ready"
+        assert status["facts"]["mode"] == "main_env"
+    finally:
+        tm.tasks.pop(task_id, None)
+        extension_state._ACTIVE_MAIN_ENV_UPGRADE = None
+
+
+def _patch_route(monkeypatch, status):
+    from mikazuki.engines.kohya import routes
+
+    monkeypatch.setattr(routes, "read_status", lambda rt: status)
+    return routes
+
+
+def test_upgrade_route_rejects_when_not_ready(monkeypatch):
+    routes = _patch_route(monkeypatch, {"state": "not_installed", "facts": {}})
+
+    import asyncio
+    response = asyncio.run(routes.upgrade({}))
+
+    assert response.status == "fail"
+
+
+def test_upgrade_route_short_circuits_when_no_drift(monkeypatch):
+    routes = _patch_route(monkeypatch, {"state": "ready", "facts": {"mode": "standalone", "update_available": False}})
+
+    import asyncio
+    response = asyncio.run(routes.upgrade({}))
+
+    assert response.status == "success"
+    assert response.data["already_up_to_date"] is True
+
+
+def test_upgrade_route_dispatches_by_mode(monkeypatch):
+    calls = []
+
+    async def fake_main_env(rt, python, sources, drift):
+        calls.append(("main_env", python))
+        return {"task_id": "t1"}
+
+    async def fake_standalone(rt, sources, drift):
+        calls.append(("standalone",))
+        return {"task_id": "t2"}
+
+    import asyncio
+    drift = [{"name": "transformers", "spec": "==5.17.0", "installed": "4.51.3"}]
+
+    routes = _patch_route(monkeypatch, {"state": "ready", "facts": {"mode": "main_env", "drift": drift}, "runtime": {"python": "/main/python"}})
+    monkeypatch.setattr(routes, "start_main_env_upgrade", lambda rt, python, sources, d: calls.append(("main_env", python)) or {"task_id": "t1"})
+    monkeypatch.setattr(routes, "start_upgrade", lambda rt, sources, d: calls.append(("standalone",)) or {"task_id": "t2"})
+    response = asyncio.run(routes.upgrade({}))
+    assert response.status == "success"
+    assert calls == [("main_env", "/main/python")]
+
+    calls.clear()
+    routes = _patch_route(monkeypatch, {"state": "ready", "facts": {"mode": "standalone", "drift": drift}, "runtime": {"python": "/standalone/python"}})
+    monkeypatch.setattr(routes, "start_main_env_upgrade", lambda rt, python, sources, d: calls.append(("main_env", python)) or {"task_id": "t1"})
+    monkeypatch.setattr(routes, "start_upgrade", lambda rt, sources, d: calls.append(("standalone",)) or {"task_id": "t2"})
+    response = asyncio.run(routes.upgrade({}))
+    assert response.status == "success"
+    assert calls == [("standalone",)]
