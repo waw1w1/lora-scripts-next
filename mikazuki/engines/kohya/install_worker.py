@@ -36,6 +36,19 @@ def main():
                 print(json.dumps(audit, ensure_ascii=False), flush=True)
                 if not audit['ok']:
                     raise RuntimeError('; '.join(audit['errors']))
+                # Record the raised pins so the GUI launcher's requirements
+                # check does not roll them back on the next start.
+                packages = plan.get('patch_packages')
+                if packages:
+                    from datetime import datetime, timezone
+                    patch_path = rt.project_root / 'config' / 'kohya_env_patch.json'
+                    patch_path.parent.mkdir(parents=True, exist_ok=True)
+                    patch_path.write_text(json.dumps({
+                        'python': plan['python'],
+                        'packages': packages,
+                        'updated_at': datetime.now(timezone.utc).isoformat(),
+                    }, ensure_ascii=False, indent=2), encoding='utf-8')
+                    print('[install] wrote env patch: ' + str(patch_path), flush=True)
                 print('[mikazuki-progress] ' + json.dumps({'percent': 100, 'message': '环境检查完成'}, ensure_ascii=False), flush=True)
                 return
             write_state(rt, 'auditing', facts)

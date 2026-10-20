@@ -231,7 +231,36 @@ def _parse_env_marker(line: str):
     return spec, True
 
 
+def env_patch_active() -> bool:
+    """A kohya main-env upgrade records config/kohya_env_patch.json; while it
+    is present for the running interpreter, the requirements version sync is
+    skipped entirely — the upgraded training stack and requirements.txt may
+    legitimately disagree (e.g. huggingface-hub) and rolling versions back
+    breaks the training env the user just upgraded.
+    """
+    import json
+
+    path = base_dir_path() / "config" / "kohya_env_patch.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not data.get("packages"):
+        return False
+    python = data.get("python")
+    if python:
+        try:
+            if Path(sys.executable).resolve() != Path(python).resolve():
+                return False
+        except OSError:
+            return False
+    return True
+
+
 def validate_requirements(requirements_file: str):
+    if env_patch_active():
+        log.info("kohya env patch present for this interpreter; skipping requirements version sync")
+        return
     with open(requirements_file, 'r', encoding='utf-8-sig') as f:
         lines = [
             line.strip()

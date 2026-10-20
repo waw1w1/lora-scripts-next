@@ -86,9 +86,11 @@ def start_main_env_upgrade(runtime, python, sources, drift):
     commands = main_env_upgrade_commands(python, sources, drift)
     if not commands:
         return None
+    from packaging.utils import canonicalize_name
     with request_lock:
         assert_idle()
-        plan = {"commands": commands, "repair": False, "target": "main_env", "python": str(python)}
+        plan = {"commands": commands, "repair": False, "target": "main_env", "python": str(python),
+                "patch_packages": {canonicalize_name(d["name"]): d["spec"] for d in drift}}
         task_id, task, streams = _prepare_plan(runtime, plan, "升级主环境训练栈（增量补装）")
         note_main_env_upgrade(python, task_id)
         task.execute()
