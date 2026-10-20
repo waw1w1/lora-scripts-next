@@ -171,6 +171,23 @@ def install_env(runtime):
     return env
 
 
+# MOSS-Image trains on the Qwen3.5 text encoder, which only exists in
+# transformers 5.x; older environments (e.g. legacy main envs) stay usable for
+# the other train types but must not start a MOSS run.
+MOSS_MIN_TRANSFORMERS_MAJOR = 5
+
+
+def moss_stack_error(audit_facts):
+    version = str((audit_facts or {}).get("transformers") or "")
+    try:
+        major = int(version.split(".")[0])
+    except (ValueError, IndexError):
+        major = 0
+    if major < MOSS_MIN_TRANSFORMERS_MAJOR:
+        return "MOSS-Image 需要 transformers 5.x（Qwen3.5 文本编码器）；当前训练环境版本过旧，请到训练引擎管理中安装/修复 kohya 独立环境。"
+    return None
+
+
 def audit_python(python):
     code = (
         "import json, torch, accelerate, transformers, diffusers, scipy; "
