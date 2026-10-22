@@ -267,3 +267,9 @@ Validation is mocked and CPU-only: schema serialization/constraints, shared modu
 selection, settings pagination, status gating, one-click install streams, cancellation,
 and preflight-before-submit are covered. No model download, runtime installation,
 or GPU training is performed by these frontend tests.
+
+### Optional KohakuMossTrainer engine
+
+- Added the upstream Kohaku MOSS schema through the existing training workbench and managed-engine APIs; existing default engines and saved configuration identities are unchanged.
+- Required enum-union conditions now exclude inactive algorithm/precision parameters. Kohaku configurations retain numeric learning rates and do not reuse Kohya-only transformations.
+- The gate reuses the current install/cancel/disposal guards; submission preflights the same payload sent to `/api/run`. Runtime installation and actual GPU training require platform validation separately from frontend checks.

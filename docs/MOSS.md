@@ -13,6 +13,18 @@ MOSS-Image 是独立模型家族，不能套用 Anima / AI Toolkit 的模型、�
 
 训练页默认选择：**模型 = MOSS-Image；引擎 = Kohya；目标 = LoRA**。需要原有流程时可手动切换到 **MOSS (anima_lora)**。
 
+### KohakuMossTrainer（可选实验性引擎）
+
+在 MOSS-Image 训练页手动选择 **KohakuMossTrainer**。默认仍是 Kohya；已有 MOSS (anima_lora) 路径不变。此引擎复用 Next Trainer 的训练引擎安装门页、下载源设置、任务日志与状态管理，独立安装到 `extensions/kohaku-moss/`，不另建训练核心或修改其它引擎环境。
+
+- Windows 和 Linux 使用独立 Python 3.12 / venv，显式安装 `lycoris-lora>=4.1.2`；安装不会下载模型。
+- 安装、修复和卸载均从「设置 → 训练引擎」操作；有运行或排队任务时禁止修改该引擎环境。
+- 原生调用为 `kogine run scripts/train/moss.py --config <生成的配置>`，参数由训练表单映射到上游配置。
+- 停止条件是 `max_train_steps`，`max_train_epochs` 只作备注。预览、量化、多卡和显存方案仍受上游支持范围限制。
+- 本集成验证覆盖配置与任务提交边界，不代表 Windows 依赖安装或 GPU 短训已经通过；进入 main / 整合包前仍需独立验收。
+
+感谢 [Kohaku-Blueleaf（Kohaku / 龙娘）与 KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer) 以及 [LyCORIS](https://github.com/KohakuBlueleaf/LyCORIS)。许可证与来源见 [NOTICE](../NOTICE.md)，集成协作见 [#492](https://github.com/wochenlong/lora-scripts-next/issues/492)。
+
 ## 2. 要提前下载什么模型
 
 安装引擎**不会**下载权重。请按你打算用的输入模式，事先备齐下列组件。
