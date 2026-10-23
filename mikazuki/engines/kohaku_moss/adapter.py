@@ -1,10 +1,10 @@
 """Next Trainer form to a checked kogine Python config."""
-from dataclasses import asdict, dataclass
-from pathlib import Path
 import math
 import os
 import re
 import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from mikazuki.engines.moss.comfy import comfy_layout_digest
 
@@ -67,7 +67,7 @@ def _absolute(value, root):
 
 def _integer(value, key, minimum=0):
     if isinstance(value, bool):
-        raise ValueError(f"{key}: 必须为整数")
+        raise ValueError(f"{key}: 必须为整数")  # noqa: TRY004 - form validation uses ValueError at the API boundary
     try:
         result = int(value)
     except (TypeError, ValueError) as exc:
@@ -79,7 +79,7 @@ def _integer(value, key, minimum=0):
 
 def _float(value, key, minimum=None):
     if isinstance(value, bool):
-        raise ValueError(f"{key}: 必须为数字")
+        raise ValueError(f"{key}: 必须为数字")  # noqa: TRY004 - form validation uses ValueError at the API boundary
     try:
         result = float(value)
     except (TypeError, ValueError) as exc:
@@ -192,7 +192,7 @@ def _resolve_comfy_weight_path(value, root: Path) -> Path:
 def _encode_settings(profile: str) -> tuple[dict, dict | None]:
     if profile == "minimal":
         return (
-            {"memory": "stream", "ahead": 8, "batch": 16, "max_tokens": 8192},
+            {"memory": "stream", "ahead": 8, "batch": 16, "max_tokens": 8192, "pinned": False},
             {"memory": "offload", "ahead": 8, "tile": True},
         )
     if profile == "low":
@@ -309,7 +309,7 @@ def adapt_config(config, runtime):
         if variant == "sft":
             comfy_paths["sft_dit_path"] = str(_absolute(sft_dit, runtime.project_root)) if sft_dit else comfy_paths["dit_path"]
         digest = comfy_layout_digest(comfy_paths, model=variant)
-        staging_dir = _absolute(runtime.project_root / ".cache" / "moss" / "comfy-layout" / digest, runtime.project_root)
+        staging_dir = _absolute(runtime.project_root / ".cache" / "kohaku-moss" / "comfy-layout" / digest, runtime.project_root)
         staging_root = str(staging_dir)
         dit_key = "sft_dit_path" if variant == "sft" else "dit_path"
         weights_dir = _resolve_comfy_weight_path(comfy_paths[dit_key], runtime.project_root)
@@ -402,6 +402,10 @@ def adapt_config(config, runtime):
         "LOG_EVERY": _integer(config.get("log_every", 10), "log_every", 1),
         "EXPORT_FORMATS": ("comfy", "lycoris"),
     }
+
+    if profile == "minimal":
+        values["MEMORY_OVERRIDES"] = {"pinned": False}
+        values["PIN_MEMORY"] = False
 
     if precision in {"fp16", "auto"}:
         values["FP16_FIX"] = _choice(config.get("fp16_fix"), "fp16_fix", {"online", "fp32_residual", "none"}, "online")

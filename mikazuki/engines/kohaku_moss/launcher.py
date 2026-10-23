@@ -1,7 +1,6 @@
 """Build the isolated kogine launch specification."""
 from dataclasses import dataclass
 from pathlib import Path
-import os
 
 from .environment import process_env
 from .settings import TRAIN_SCRIPT

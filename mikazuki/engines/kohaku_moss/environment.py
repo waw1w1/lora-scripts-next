@@ -6,6 +6,7 @@ import os
 import subprocess
 
 from mikazuki.download_sources import install_process_env, pytorch_extra_index_url
+
 from .manifest import UPSTREAM
 from .settings import PYTHON_VERSION, TRAIN_SCRIPT
 
@@ -74,7 +75,7 @@ print(json.dumps({"torch": torch.__version__, "cuda": torch.version.cuda,
  "cuda_available": torch.cuda.is_available(), "lycoris": md.version("lycoris-lora"),
  "kohakumoss": md.version("kohakumoss")}))
 """
-    kwargs = dict(cwd=runtime.source, env=process_env(), capture_output=True, text=True, encoding="utf-8", errors="replace")
+    kwargs = {"cwd": runtime.source, "env": process_env(), "capture_output": True, "text": True, "encoding": "utf-8", "errors": "replace"}
     head = run(["git", "-C", str(runtime.source), "rev-parse", "HEAD"], **kwargs)
     facts["source_commit"] = head.stdout.strip()
     if head.returncode or facts["source_commit"] != UPSTREAM["commit"]:

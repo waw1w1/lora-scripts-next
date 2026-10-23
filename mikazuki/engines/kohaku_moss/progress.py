@@ -1,7 +1,7 @@
 """Best-effort parser for kogine/KohakuMoss step logs."""
-import re
 import json
 import math
+import re
 from pathlib import Path
 
 STEP_RE = re.compile(r"\bstep\s+(\d+)\b", re.IGNORECASE)

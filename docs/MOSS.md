@@ -21,7 +21,9 @@ MOSS-Image 是独立模型家族，不能套用 Anima / AI Toolkit 的模型、�
 - 安装、修复和卸载均从「设置 → 训练引擎」操作；有运行或排队任务时禁止修改该引擎环境。
 - 原生调用为 `kogine run scripts/train/moss.py --config <生成的配置>`，参数由训练表单映射到上游配置。
 - 停止条件是 `max_train_steps`，`max_train_epochs` 只作备注。预览、量化、多卡和显存方案仍受上游支持范围限制。
-- 本集成验证覆盖配置与任务提交边界，不代表 Windows 依赖安装或 GPU 短训已经通过；进入 main / 整合包前仍需独立验收。
+- `minimal` 档禁用文本编码器 streaming、训练内存计划及数据批次的 pinned memory；实际显存需求仍取决于分辨率、组批和网络配置。
+- Comfy 编码器暂存目录为 `.cache/kohaku-moss/comfy-layout/`，与 MOSS (anima_lora) 隔离；旧 `.cache/moss/` 保留给原引擎，不自动删除或迁移。
+- 已验证 Windows / RTX 5090 D 的独立环境安装及 UI 启动 10 步短训：Comfy BF16 Base、`minimal`、512² 目标面积、batch 1、LoKr Rank/Alpha 16；loss 和梯度有限、无跳步，检查点权重实际更新，Comfy / LyCORIS 导出张量可读取。此结果不代表 12GB 显卡、其它组合或推理质量已经验收。
 
 感谢 [Kohaku-Blueleaf（Kohaku / 龙娘）与 KohakuMossTrainer](https://github.com/KohakuBlueleaf/KohakuMossTrainer) 以及 [LyCORIS](https://github.com/KohakuBlueleaf/LyCORIS)。许可证与来源见 [NOTICE](../NOTICE.md)，集成协作见 [#492](https://github.com/wochenlong/lora-scripts-next/issues/492)。
 

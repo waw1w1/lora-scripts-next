@@ -1,5 +1,4 @@
 """No downloads or training: exercise the real API up to the task boundary."""
-import asyncio
 import ast
 import json
 from pathlib import Path
@@ -11,7 +10,15 @@ from fastapi.testclient import TestClient
 
 from mikazuki.app import api
 from mikazuki.download_sources import DownloadSources
-from mikazuki.engines.kohaku_moss import environment, extension_state, install_worker, installer, routes, run, settings
+from mikazuki.engines.kohaku_moss import (
+    environment,
+    extension_state,
+    install_worker,
+    installer,
+    routes,
+    run,
+    settings,
+)
 from mikazuki.engines.kohaku_moss.manifest import UPSTREAM
 from mikazuki.tasks import TaskStatus
 
@@ -31,8 +38,8 @@ def runtime(tmp_path, monkeypatch):
 def test_windows_install_reuses_next_isolated_environment(runtime, monkeypatch):
     monkeypatch.setattr(settings.sys, "platform", "win32")
     commands = installer.installation_plan(runtime, DownloadSources())
-    assert str(runtime.python).endswith(".venv/Scripts/python.exe")
-    assert str(runtime.kogine).endswith(".venv/Scripts/kogine.exe")
+    assert runtime.python.relative_to(runtime.root) == Path(".venv/Scripts/python.exe")
+    assert runtime.kogine.relative_to(runtime.root) == Path(".venv/Scripts/kogine.exe")
     assert commands[0][:2] == ["git", "clone"]
     assert commands[1][-1] == UPSTREAM["commit"]
     pip_commands = [c for c in commands if c[:3] == ["uv", "pip", "install"]]
@@ -56,7 +63,8 @@ def test_install_records_failure_and_retry_can_recover(runtime, monkeypatch):
 
 def test_uninstall_preserves_other_engines_and_blocks_queued_work(runtime, monkeypatch):
     other = runtime.root.parent / "kohya" / "keep.txt"
-    other.parent.mkdir(parents=True); other.write_text("keep")
+    other.parent.mkdir(parents=True)
+    other.write_text("keep")
     task = SimpleNamespace(metadata={"backend": "kohaku-moss"}, status=TaskStatus.QUEUED)
     monkeypatch.setattr(installer.tm, "tasks", {"queued": task})
     with pytest.raises(ValueError, match="尚未结束"):
@@ -74,7 +82,8 @@ def test_http_preflight_and_run_map_parameters_without_training(runtime, monkeyp
     for sub in ("transformer", "text_encoder", "vae"):
         (model / sub).mkdir(parents=True)
         (model / sub / "config.json").write_text("{}")
-    dataset = runtime.project_root / "dataset"; dataset.mkdir()
+    dataset = runtime.project_root / "dataset"
+    dataset.mkdir()
     (dataset / "image.png").write_bytes(b"synthetic image, no model loads")
     payload = {
         "model_train_type": "kohaku-moss-image-lora", "model_input_mode": "native_directory",
@@ -97,7 +106,8 @@ def test_http_preflight_and_run_map_parameters_without_training(runtime, monkeyp
     monkeypatch.setattr(run.tm, "create_task", create)
     monkeypatch.setattr(run.tm, "submit", lambda task: None)
     monkeypatch.setattr(run.tm, "tasks", {})
-    app = FastAPI(); app.include_router(api.router, prefix="/api")
+    app = FastAPI()
+    app.include_router(api.router, prefix="/api")
     client = TestClient(app)
     preflight = client.post("/api/engines/kohaku-moss/preflight", json=payload).json()
     assert preflight["status"] == "success", preflight
@@ -121,7 +131,7 @@ def test_http_preflight_and_run_map_parameters_without_training(runtime, monkeyp
 
 
 def test_literal_engine_config_archive_never_executes_python(tmp_path):
-    from mikazuki.user_data import _configuration_snapshot, UserDataError
+    from mikazuki.user_data import UserDataError, _configuration_snapshot
     config = tmp_path / "engine.py"
     config.write_text('"""Generated config."""\nDIM = 24\nCAPTION = {"keep": ()}\n')
     suffix, values, text = _configuration_snapshot(config)
@@ -134,6 +144,7 @@ def test_literal_engine_config_archive_never_executes_python(tmp_path):
 
 
 def test_checkout_or_audit_failure_never_marks_ready(runtime, monkeypatch):
+    (runtime.source / ".git").mkdir()
     calls = []
     def checkout_failure(command, **kwargs):
         calls.append(command)
@@ -154,8 +165,10 @@ def test_checkout_or_audit_failure_never_marks_ready(runtime, monkeypatch):
 
 def test_metrics_and_previews_follow_pinned_upstream_layout(runtime, monkeypatch):
     import time
+
     import toml
     from PIL import Image
+
     from mikazuki.utils import task_insights
     now = time.time()
     output = runtime.project_root / 'output' / 'run'
@@ -174,7 +187,8 @@ def test_metrics_and_previews_follow_pinned_upstream_layout(runtime, monkeypatch
                 'logging_dir': str(output), 'output_name': 'run', 'total_steps': 100, 'started_at': now}
     monkeypatch.setattr(api.tm, 'tasks', {'metrics-test': SimpleNamespace(metadata=metadata)})
     monkeypatch.setattr(api.train_log_hub, 'tail', lambda *a: ['step \x1b[36m20\x1b[0m loss=0.3 lr=0.0001', 'retune_steps = 3'])
-    app = FastAPI(); app.include_router(api.router, prefix='/api')
+    app = FastAPI()
+    app.include_router(api.router, prefix='/api')
     client = TestClient(app)
     metrics = client.get('/api/tasks/metrics-test/metrics').json()['data']
     assert metrics['progress'] == {'step': 20, 'total_steps': 100, 'percent': 20}
@@ -194,6 +208,7 @@ def test_training_entry_holds_existing_environment_lock(runtime, monkeypatch):
     import subprocess
     import sys
     import time
+
     from mikazuki.engines.kohaku_moss import entry
     pytest.importorskip("kohakuengine")
     marker = runtime.project_root / 'waiting'
@@ -215,7 +230,8 @@ def test_training_entry_holds_existing_environment_lock(runtime, monkeypatch):
         assert child.returncode == 0, stdout + stderr
     finally:
         if child.poll() is None:
-            child.kill(); child.communicate()
+            child.kill()
+            child.communicate()
     installer.remove_extension(runtime)
     assert not runtime.root.exists()
 

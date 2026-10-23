@@ -1,8 +1,8 @@
 """Serialize runtime mutation across requests and processes."""
-from contextlib import contextmanager
-from pathlib import Path
 import os
 import threading
+from contextlib import contextmanager
+from pathlib import Path
 
 request_lock = threading.RLock()
 
@@ -19,12 +19,18 @@ def environment_lock(root):
                 handle.write(b"0")
                 handle.flush()
             handle.seek(0)
-            lock = lambda: msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-            unlock = lambda: msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            def lock():
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+
+            def unlock():
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
-            lock = lambda: fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            unlock = lambda: fcntl.flock(handle, fcntl.LOCK_UN)
+            def lock():
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+            def unlock():
+                fcntl.flock(handle, fcntl.LOCK_UN)
         try:
             lock()
         except OSError as exc:

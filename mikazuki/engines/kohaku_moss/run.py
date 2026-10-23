@@ -1,11 +1,12 @@
 """Gate, adapt, preflight, persist and launch KohakuMossTrainer."""
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 import toml
 
 from mikazuki.app.models import APIResponseFail, APIResponseSuccess
 from mikazuki.tasks import TaskStatus, tm
+
 from .adapter import adapt_config, dump_config
 from .extension_state import check_runtime
 from .installer import assert_idle

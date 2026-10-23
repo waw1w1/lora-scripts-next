@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
-from pathlib import Path
 import shutil
 import sys
 import threading
 import uuid
+from dataclasses import asdict
+from pathlib import Path
 
 from mikazuki.download_sources import DownloadSources, apply_github_prefix
 from mikazuki.tasks import LANE_MAINTENANCE, TaskStatus, tm
+
 from .environment import install_commands, process_env
 from .extension_state import write_state
 from .manifest import UPSTREAM

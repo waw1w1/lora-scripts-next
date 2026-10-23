@@ -1,7 +1,7 @@
 import sys
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 from mikazuki.download_sources import DownloadSources
 from mikazuki.engines.kohaku_moss.adapter import adapt_config, dump_config

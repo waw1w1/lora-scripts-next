@@ -1,7 +1,11 @@
 """Asset checks that do not import the ML runtime."""
 from pathlib import Path
 
-from mikazuki.engines.moss.comfy import materialize_comfy_encoders, validate_comfy_components
+from mikazuki.engines.moss.comfy import (
+    materialize_comfy_encoders,
+    validate_comfy_components,
+)
+
 from .adapter import adapt_config
 
 
