@@ -19,7 +19,8 @@ def build_launch_spec(runtime, config_path, gpu_ids=None):
     if gpu_ids:
         env["CUDA_VISIBLE_DEVICES"] = ",".join(str(value) for value in gpu_ids)
     command = [
-        str(runtime.kogine),
+        str(runtime.python), "-E", "-s", "-u", "-X", "utf8",
+        str(Path(__file__).with_name("entry.py")), str(runtime.project_root),
         "run",
         str(runtime.source / TRAIN_SCRIPT),
         "--config",

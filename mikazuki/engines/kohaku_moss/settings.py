@@ -7,6 +7,7 @@ import sys
 from .manifest import FEATURE_FLAG_ENV
 
 PYTHON_VERSION = "3.12"
+INSTALL_REVISION = 2  # Includes the optim extra required by the optimizer selector.
 TRAIN_SCRIPT = "scripts/train/moss.py"
 PROJECT_ROOT_ENV = "NEXT_TRAINER_PROJECT_ROOT"
 

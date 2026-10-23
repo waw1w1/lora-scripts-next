@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { createDefaultModel, executeSchemaSources, serializeModel, validateModel } from "../schema/adapter"
 import { buildTrainingConfig, hydrateImportedConfig, pickCarryOverFields } from "./params"
+import type { FormModel } from "../schema/adapter"
 import { DEFAULT_SELECTION, idealEngineFor, resolveModule } from "./modules"
 
 const name = "kohaku-moss-image-lora"
@@ -34,5 +35,17 @@ describe("Kohaku parameter contract", () => {
   })
   it("does not leak Kohya defaults into Kohaku", () => {
     expect(pickCarryOverFields({ model_train_type: "moss-image-lora", optimizer_type: "AdamW8bit", network_dim: 16, learning_rate: "1e-4", train_data_dir: "./custom" }, defaults)).toEqual({ train_data_dir: "./custom" })
+  })
+})
+
+describe("Kohaku precision and pipeline fields", () => {
+  it("serializes only the active companion parameters", () => {
+    const serialize = (values: FormModel) => buildTrainingConfig(serializeModel(schema, { ...defaults, ...values }), name)
+    expect(serialize({ mixed_precision: "fp16" })).toMatchObject({ fp16_fix: "online" })
+    expect(serialize({ mixed_precision: "auto", fp16_fix: "none" })).toMatchObject({ fp16_fix: "none" })
+    expect(serialize({ parallel_mode: "pipeline" })).toMatchObject({ pipeline_schedule: "auto", microbatches: 4 })
+    expect(serialize({ parallel_mode: "threaded", pipeline_schedule: "async" })).toMatchObject({ pipeline_schedule: "async", microbatches: 4 })
+    const ordinary = serialize({ mixed_precision: "bf16", fp16_fix: "online", parallel_mode: "none", pipeline_schedule: "async", microbatches: 8 })
+    for (const field of ["fp16_fix", "pipeline_schedule", "microbatches"]) expect(ordinary).not.toHaveProperty(field)
   })
 })

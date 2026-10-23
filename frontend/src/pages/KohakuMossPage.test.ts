@@ -177,3 +177,34 @@ describe("MOSS runtime gate", () => {
   })
 
 })
+
+describe("Kohaku status response ordering", () => {
+  it("accepts a slow response while the next poll is still pending", async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    let resolveSlow!: (value: EngineStatus) => void
+    vi.mocked(enginesApi.status).mockReturnValueOnce(new Promise(resolve => { resolveSlow = resolve }))
+    await vi.advanceTimersByTimeAsync(2000)
+    vi.mocked(enginesApi.status).mockReturnValueOnce(new Promise(() => {}))
+    await vi.advanceTimersByTimeAsync(2000)
+    resolveSlow(ready)
+    await flushPromises()
+    expect(wrapper.find(".training-page-stub").exists()).toBe(true)
+  })
+
+  it("an old not-installed response must not erase a newer ready result", async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    let resolveOld!: (value: EngineStatus) => void
+    vi.mocked(enginesApi.status).mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve }))
+    await vi.advanceTimersByTimeAsync(2000)
+    vi.mocked(enginesApi.status).mockResolvedValueOnce(ready)
+    await vi.advanceTimersByTimeAsync(2000)
+    await flushPromises()
+    expect(wrapper.find(".training-page-stub").exists()).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+    resolveOld(missing)
+    await flushPromises()
+    expect(wrapper.find(".training-page-stub").exists()).toBe(true)
+  })
+})

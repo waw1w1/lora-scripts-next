@@ -18,6 +18,8 @@ const logs = ref<string[]>([])
 const progress = ref(0)
 const phase = ref("")
 let disposed = false
+let refreshSequence = 0
+let appliedRefresh = 0
 let timer: number | undefined
 let logSource: EventSource | undefined
 let progressSource: EventSource | undefined
@@ -83,15 +85,17 @@ function streams(taskId: string, logUrl?: string, progressUrl?: string) {
 }
 
 async function refresh(reportError = true) {
+  const sequence = ++refreshSequence
   try {
     const next = await enginesApi.status("kohaku-moss")
-    if (disposed) return
+    if (disposed || sequence < appliedRefresh) return
+    appliedRefresh = sequence
     status.value = next
     if (ready.value) { stopPolling(); closeStreams() }
     const id = status.value.facts?.task_id
     if (id && working.value && !logSource) streams(String(id))
   } catch (error) {
-    if (reportError) ElMessage.error(error instanceof Error ? error.message : t("settings.engines.msg.statusFail"))
+    if (!disposed && sequence >= appliedRefresh && reportError) ElMessage.error(error instanceof Error ? error.message : t("settings.engines.msg.statusFail"))
   }
 }
 
@@ -109,6 +113,7 @@ async function install(forceReinstall = false) {
     progress.value = 0
     const data = forceReinstall ? await enginesApi.repair("kohaku-moss") : await enginesApi.install("kohaku-moss")
     if (disposed) return
+    appliedRefresh = ++refreshSequence
     if (data.status) status.value = data.status
     if (data.alreadyReady) {
       if (!data.status) await refresh()

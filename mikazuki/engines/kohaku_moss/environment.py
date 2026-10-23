@@ -47,7 +47,7 @@ def install_commands(runtime, sources) -> list[list[str]]:
             "--index-strategy",
             "unsafe-best-match",
             "-e",
-            f"{runtime.source}[cuda]",
+            f"{runtime.source}[cuda,optim]",
             LYCORIS_REQUIREMENT,
             *TORCH_REQUIREMENTS,
         ],
@@ -69,7 +69,7 @@ def audit_environment(runtime, *, runner=None) -> dict:
         errors.append("KohakuMossTrainer 缺少 Windows Triton 编译失败回退补丁。")
     probe = """
 import importlib.metadata as md, json, torch
-import kohakumoss, kohakuengine, lycoris
+import kohakumoss, kohakuengine, lycoris, prodigyopt, schedulefree
 print(json.dumps({"torch": torch.__version__, "cuda": torch.version.cuda,
  "cuda_available": torch.cuda.is_available(), "lycoris": md.version("lycoris-lora"),
  "kohakumoss": md.version("kohakumoss")}))

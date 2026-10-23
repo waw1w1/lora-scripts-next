@@ -45,7 +45,7 @@ Schema.intersect([
                 .description("每 N 步保存一次权重；0 为仅结束时保存"),
             optimizer_type: Schema.union([
                 "adamw", "adamw16", "adamw8bit", "adamw8bit_kernel", "muon", "prodigy", "schedule_free",
-            ]).default("adamw").description("优化器类型（默认推荐 adamw；显存受限可选 adamw8bit_kernel 或 adamw8bit）"),
+            ]).default("adamw").description("优化器类型（low / minimal 仅支持 adamw；其他档位也可选 8bit 等优化器）"),
             learning_rate: Schema.number().min(0).step(0.000001).default(0.0001)
                 .description("学习率（默认 0.0001 即 1e-4）"),
         }),
@@ -243,8 +243,38 @@ Schema.intersect([
             parallel_mode: Schema.union(["none", "ddp", "fsdp", "pipeline", "threaded"]).default("none")
                 .description("多卡并行策略（单卡及 Windows 环境保持 none）"),
             devices: Schema.string().default("0")
-                .description("使用 GPU 编号，多卡用逗号分隔（如 0 或 0,1）"),
+                .description("可见 GPU 集合内的本地编号，多卡用逗号分隔（如 0 或 0,1；none 仅一个编号）"),
         }).description("高级：底层精度、编译与多卡设置（保持默认即可）"),
+
+        Schema.union([
+            Schema.object({
+                mixed_precision: Schema.union(["fp16", "auto"]).required(),
+                fp16_fix: Schema.union(["online", "fp32_residual", "none"]).default("online")
+                    .description("FP16 溢出修复（online 使用上游推荐 c=1/16；已带修复的单文件权重请选择 none）"),
+            }),
+            Schema.object({}),
+        ]),
+        Schema.union([
+            Schema.object({
+                parallel_mode: Schema.const("pipeline").required(),
+                pipeline_schedule: Schema.union(["auto", "gpipe", "1f1b"]).default("auto")
+                    .description("流水线调度（auto = 1f1b；需 tokens 组批、max_samples ≥ 1、离线文本缓存；自动使用 exact Token 预算）"),
+            }),
+            Schema.object({
+                parallel_mode: Schema.const("threaded").required(),
+                pipeline_schedule: Schema.union(["auto", "gpipe", "async"]).default("auto")
+                    .description("线程流水线调度（auto = gpipe）"),
+            }),
+            Schema.object({}),
+        ]),
+        Schema.union([
+            Schema.object({
+                parallel_mode: Schema.union(["pipeline", "threaded"]).required(),
+                microbatches: Schema.number().min(1).default(4)
+                    .description("流水线微批次数（pipeline 时不得少于设备数；流水线需要 speed / auto、compute 底模精度，并关闭训练预览）"),
+            }),
+            Schema.object({}),
+        ]),
 
         Schema.union([
             Schema.object({

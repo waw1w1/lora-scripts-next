@@ -1,4 +1,6 @@
 import sys
+
+import pytest
 from pathlib import Path
 
 from mikazuki.download_sources import DownloadSources
@@ -8,7 +10,7 @@ from mikazuki.engines.kohaku_moss.extension_state import read_status, write_stat
 from mikazuki.engines.kohaku_moss.installer import installation_plan
 from mikazuki.engines.kohaku_moss.manifest import ENGINE_ID, TRAIN_TYPES, UPSTREAM
 from mikazuki.engines.kohaku_moss.patch_upstream import apply_patch
-from mikazuki.engines.kohaku_moss.settings import Runtime
+from mikazuki.engines.kohaku_moss.settings import INSTALL_REVISION, Runtime
 from mikazuki.engines.portable_venv import read_venv_home
 
 
@@ -68,7 +70,7 @@ def test_packaged_runtime_repairs_moved_python_home(tmp_path):
     )
     base.parent.mkdir(parents=True)
     base.write_bytes(b"")
-    write_state(runtime, "ready")
+    write_state(runtime, "ready", {"install_revision": INSTALL_REVISION})
     status = read_status(runtime)
     assert status["state"] == "ready"
     assert read_venv_home(runtime.python) == base.parent
@@ -254,3 +256,59 @@ def test_config_import_and_dataset_validate_accept_kohaku_moss():
     )
     assert payload["result"] == "ok"
     assert "enable_preview" not in payload["config"]
+
+
+def test_optim_extra_and_old_installs_need_upgrade(tmp_path):
+    runtime = Runtime(tmp_path)
+    assert f"{runtime.source}[cuda,optim]" in install_commands(runtime, DownloadSources())[-1]
+    for path in (runtime.python, runtime.kogine, runtime.source / 'scripts/train/moss.py'):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+    write_state(runtime, 'ready')
+    assert read_status(runtime)['state'] == 'installed_unverified'
+
+
+@pytest.mark.parametrize('precision', ['fp16', 'auto'])
+def test_fp16_fix_has_required_scale_and_can_preserve_fixed_weights(tmp_path, precision):
+    values = adapt_config(_base(mixed_precision=precision), Runtime(tmp_path)).values
+    assert values['FP16_FIX'] == 'online'
+    assert values['FP16_FIX_KWARGS'] == {'c': 1 / 16}
+    values = adapt_config(_base(mixed_precision=precision, fp16_fix='none'), Runtime(tmp_path)).values
+    assert values['FP16_FIX'] == 'none' and values['FP16_FIX_KWARGS'] == {}
+
+
+@pytest.mark.parametrize('parallel,schedule', [('pipeline', '1f1b'), ('threaded', 'gpipe')])
+def test_pipeline_has_native_companion_parameters(tmp_path, monkeypatch, parallel, schedule):
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    values = adapt_config(_base(parallel_mode=parallel, devices='0,1', memory_profile='speed',
+                                batching='tokens', max_samples=4, text_cache='offline',
+                                sample_every_n_steps=0), Runtime(tmp_path)).values
+    assert values['PIPELINE_SCHEDULE'] == schedule
+    assert values['MICROBATCHES'] == 4
+    if parallel == 'pipeline':
+        assert values['TOKEN_BUDGET'] == 'exact'
+
+
+@pytest.mark.parametrize('overrides,field', [
+    ({'lr_schedule_end': 4}, 'lr_warmup_steps'),
+    ({'devices': '0,1'}, 'devices'),
+    ({'devices': '2', 'gpu_ids': ['2']}, 'devices'),
+    ({'gpu_ids': '0,1'}, 'gpu_ids'),
+    ({'optimizer_type': 'prodigy'}, 'optimizer_type'),
+    ({'network_alpha': float('nan')}, 'network_alpha'),
+    ({'parallel_mode': 'threaded'}, 'memory_profile'),
+    ({'parallel_mode': 'threaded', 'memory_profile': 'speed'}, 'sample_every_n_steps'),
+    ({'parallel_mode': 'pipeline', 'memory_profile': 'speed', 'sample_every_n_steps': 0}, 'text_cache'),
+    ({'parallel_mode': 'threaded', 'memory_profile': 'speed', 'sample_every_n_steps': 0,
+      'pipeline_schedule': '1f1b'}, 'pipeline_schedule'),
+])
+def test_invalid_native_combinations_fail_before_launch(tmp_path, monkeypatch, overrides, field):
+    monkeypatch.setattr(sys, 'platform', 'linux')
+    with pytest.raises(ValueError, match=field):
+        adapt_config(_base(**overrides), Runtime(tmp_path))
+
+
+def test_windows_multigpu_is_an_error_not_a_warning(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, 'platform', 'win32')
+    with pytest.raises(ValueError, match='Linux'):
+        adapt_config(_base(parallel_mode='ddp'), Runtime(tmp_path))

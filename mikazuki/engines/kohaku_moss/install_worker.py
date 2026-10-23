@@ -11,11 +11,12 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from mikazuki.download_sources import DownloadSources
+from mikazuki.networking import redact
 from mikazuki.engines.kohaku_moss.environment import audit_environment, install_env
 from mikazuki.engines.kohaku_moss.extension_state import write_state
 from mikazuki.engines.kohaku_moss.manifest import UPSTREAM
 from mikazuki.engines.kohaku_moss.resource import environment_lock
-from mikazuki.engines.kohaku_moss.settings import Runtime
+from mikazuki.engines.kohaku_moss.settings import INSTALL_REVISION, Runtime
 
 
 def progress(percent, message):
@@ -23,7 +24,7 @@ def progress(percent, message):
 
 
 def execute_plan(runtime, plan, task_id):
-    facts = {"task_id": task_id, "source_commit": UPSTREAM["commit"]}
+    facts = {"task_id": task_id, "source_commit": UPSTREAM["commit"], "install_revision": INSTALL_REVISION}
     with environment_lock(runtime.root):
         try:
             if plan.get("repair"):
@@ -35,7 +36,7 @@ def execute_plan(runtime, plan, task_id):
                 commands[0] = ["git", "-C", str(runtime.source), "fetch", "origin", UPSTREAM["commit"]]
             sources = DownloadSources(**(plan.get("download_sources") or {}))
             for index, command in enumerate(commands):
-                progress(int(index * 88 / max(len(commands), 1)), " ".join(command))
+                progress(int(index * 88 / max(len(commands), 1)), redact(" ".join(command)))
                 subprocess.run(command, cwd=runtime.project_root, env=install_env(runtime, sources), check=True)
             write_state(runtime, "auditing", facts)
             progress(92, "审计 KohakuMossTrainer、LyCORIS 与 CUDA")

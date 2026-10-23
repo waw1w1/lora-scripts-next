@@ -1,7 +1,7 @@
 """Persistent install state for the optional runtime."""
 import json
 
-from .settings import PYTHON_VERSION, TRAIN_SCRIPT, feature_enabled
+from .settings import INSTALL_REVISION, PYTHON_VERSION, TRAIN_SCRIPT, feature_enabled
 
 
 def write_state(runtime, state, facts=None, reason=""):
@@ -45,6 +45,8 @@ def read_status(runtime):
         )
     if data["state"] == "ready" and not complete:
         data.update(state="broken", reason="独立 Python、kogine 或训练入口缺失。")
+    if data["state"] == "ready" and data.get("facts", {}).get("install_revision") != INSTALL_REVISION:
+        data.update(state="installed_unverified", reason="优化器依赖已更新；请安装或修复环境以补齐依赖。")
     data["feature_enabled"] = feature_enabled()
     if not data["feature_enabled"]:
         data["state"] = "disabled"

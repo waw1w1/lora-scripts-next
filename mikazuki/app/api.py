@@ -1047,6 +1047,8 @@ async def task_previews(task_id: str) -> APIResponse:
     preview_enabled = bool(config.get(preview_key)) if config else None
     if task.metadata.get("backend") == "moss":
         preview_enabled = task_insights.moss_preview_enabled(task.metadata)
+    if task.metadata.get("backend") == "kohaku-moss":
+        preview_enabled = bool(config.get("sample_prompts")) and int(config.get("sample_every_n_steps") or 0) > 0
     return APIResponseSuccess(data={"images": images, "preview_enabled": preview_enabled})
 
 

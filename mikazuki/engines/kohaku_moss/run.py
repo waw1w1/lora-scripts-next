@@ -12,6 +12,7 @@ from .installer import assert_idle
 from .launcher import build_launch_spec
 from .manifest import UPSTREAM
 from .preflight import check_inputs
+from .resource import request_lock
 from .settings import runtime
 
 
@@ -33,11 +34,16 @@ def build_dry_run(config, rt):
 
 
 def handle_run(config, ctx):
+    with request_lock:
+        return _handle_run(config, ctx)
+
+
+def _handle_run(config, ctx):
     try:
         rt = runtime()
         assert_idle(maintenance_only=True)
         check_runtime(rt)
-        adapted = adapt_config(config, rt)
+        adapted = adapt_config({**config, "gpu_ids": ctx.gpu_ids}, rt)
         preflight = check_inputs(adapted, materialize=True)
         if not preflight["ok"]:
             raise ValueError("; ".join(preflight["errors"]))

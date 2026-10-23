@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 import shutil
 import sys
@@ -50,7 +51,7 @@ def start_install(runtime, sources=None, repair=False):
         plan_path = runtime.project_root / "config" / "autosave" / f"{task_id}.json"
         plan_path.parent.mkdir(parents=True, exist_ok=True)
         plan_path.write_text(
-            json.dumps({"commands": installation_plan(runtime, sources), "repair": repair, "download_sources": sources.as_dict()}),
+            json.dumps({"commands": installation_plan(runtime, sources), "repair": repair, "download_sources": asdict(sources)}),
             encoding="utf-8",
         )
         task = tm.create_task(

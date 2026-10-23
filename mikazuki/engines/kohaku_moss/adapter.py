@@ -32,10 +32,10 @@ SUPPORTED_FIELDS = {
     "use_tucker", "use_scalar", "rank_dropout_scale",
     "dylora_block_size", "ia3_train_on_input",
     "tlora_mask_min_rank", "tlora_mask_alpha", "tlora_mask_max_timestep",
-    "memory_profile", "mixed_precision", "base_precision",
+    "memory_profile", "mixed_precision", "base_precision", "fp16_fix",
     "fp8_recipe", "fp8_dgrad",
     "compile_mode", "tune_mode", "retune_steps",
-    "parallel_mode", "devices", "gpu_ids",
+    "parallel_mode", "devices", "gpu_ids", "pipeline_schedule", "microbatches",
 }
 ALGORITHMS = {"lora", "locon", "loha", "lokr", "oft", "boft", "glora", "ia3", "dylora", "tlora"}
 PRESETS = {"attn", "attn-mlp", "full-block", "all"}
@@ -257,8 +257,9 @@ def adapt_config(config, runtime):
     schedule_mode = _choice(config.get("lr_scheduler_mode"), "lr_scheduler_mode", {"cosine", "linear", "constant"}, "cosine")
 
     warmup = _integer(config.get("lr_warmup_steps", 100), "lr_warmup_steps")
-    if warmup >= steps:
-        raise ValueError("lr_warmup_steps: 必须小于 max_train_steps")
+    schedule_end = _integer(config.get("lr_schedule_end", -1), "lr_schedule_end", -1)
+    if warmup >= (steps if schedule_end == -1 else schedule_end):
+        raise ValueError("lr_warmup_steps: 必须小于 lr_schedule_end（-1 时为 max_train_steps）")
 
     raw_sample_every = _integer(config.get("sample_every_n_steps", 0), "sample_every_n_steps")
     prompts = _prompt_list(config.get("sample_prompts"))
@@ -273,10 +274,31 @@ def adapt_config(config, runtime):
         raise ValueError("dropout_input: DoRA 不支持输入 dropout")
 
     dim = 1 if algorithm == "ia3" else _integer(config.get("network_dim", 32), "network_dim", 1)
-    alpha = 1.0 if algorithm == "ia3" else float(config.get("network_alpha", config.get("network_dim", 32)))
+    alpha = 1.0 if algorithm == "ia3" else _float(config.get("network_alpha", config.get("network_dim", 32)), "network_alpha", 0.0)
     # gpu_ids selects visible physical GPUs in the launcher; DEVICES is local
     # to that visible set and must match preflight and /api/run (which pops gpu_ids).
     devices = _devices(config.get("devices") or "0")
+    gpu_ids = config.get("gpu_ids")
+    if gpu_ids is not None and (not isinstance(gpu_ids, list) or any(not str(gpu).isdigit() for gpu in gpu_ids)):
+        raise ValueError("gpu_ids: 必须为 GPU 编号列表")
+    if len(set(devices)) != len(devices) or (gpu_ids and max(devices) >= len(gpu_ids)):
+        raise ValueError("devices: 编号不能重复，且必须位于 gpu_ids 选定的可见 GPU 集合内（从 0 开始）")
+    if parallel == "none" and len(devices) > 1:
+        raise ValueError("devices: parallel_mode=none 只能选择一张 GPU")
+    if parallel != "none" and sys.platform == "win32":
+        raise ValueError("parallel_mode: 上游多卡训练仅支持 Linux；Windows 请使用 none")
+    if profile in {"low", "minimal"} and optimizer != "adamw":
+        raise ValueError("optimizer_type: low / minimal 的流式优化器仅支持 adamw；其他优化器请选择 balanced / speed / auto")
+    if parallel in {"fsdp", "pipeline", "threaded"}:
+        if profile not in {"speed", "auto"} or base_precision != "compute":
+            raise ValueError("parallel_mode: fsdp / pipeline / threaded 需要 memory_profile=speed 或 auto，且 base_precision=compute")
+        if sample_every:
+            raise ValueError("sample_every_n_steps: fsdp / pipeline / threaded 不支持训练中预览，请设为 0")
+    if parallel == "fsdp" and optimizer == "muon":
+        raise ValueError("optimizer_type: muon 不支持 fsdp，请使用 ddp 或其他优化器")
+    max_samples = _integer(config.get("max_samples", 0), "max_samples")
+    if parallel == "pipeline" and (batching == "count" or max_samples < 1 or text_cache != "offline"):
+        raise ValueError("parallel_mode: pipeline 需要 tokens / tokens_ffd、max_samples >= 1 和 text_cache=offline")
 
     comfy_paths = None
     staging_root = None
@@ -320,7 +342,7 @@ def adapt_config(config, runtime):
         "BATCHING": batching,
         "BATCH_SIZE": _integer(config.get("batch_size", 4), "batch_size", 1),
         "MAX_TOKENS": _integer(config.get("max_tokens", 12288), "max_tokens", 256),
-        "MAX_SAMPLES": _integer(config.get("max_samples", 0), "max_samples"),
+        "MAX_SAMPLES": max_samples,
         "GRAD_ACC": _integer(config.get("grad_acc", 1), "grad_acc", 1),
         "RESOLUTION_MODE": resolution_mode,
         "TARGET_AREA": _integer(config.get("target_area", 1024 * 1024), "target_area", 65536),
@@ -351,7 +373,7 @@ def adapt_config(config, runtime):
         "SCHEDULE": {
             "mode": schedule_mode,
             "warmup": warmup,
-            "end": _integer(config.get("lr_schedule_end", -1), "lr_schedule_end", -1),
+            "end": schedule_end,
             "min_value": _float(config.get("lr_min_value", 0.1), "lr_min_value", 0.0),
         },
         "MEMORY_PROFILE": profile,
@@ -380,6 +402,19 @@ def adapt_config(config, runtime):
         "LOG_EVERY": _integer(config.get("log_every", 10), "log_every", 1),
         "EXPORT_FORMATS": ("comfy", "lycoris"),
     }
+
+    if precision in {"fp16", "auto"}:
+        values["FP16_FIX"] = _choice(config.get("fp16_fix"), "fp16_fix", {"online", "fp32_residual", "none"}, "online")
+        values["FP16_FIX_KWARGS"] = {"c": 1 / 16} if values["FP16_FIX"] == "online" else {}
+    if parallel in {"pipeline", "threaded"}:
+        schedules = {"auto", "gpipe", "async"} if parallel == "threaded" else {"auto", "gpipe", "1f1b"}
+        schedule = _choice(config.get("pipeline_schedule"), "pipeline_schedule", schedules, "auto")
+        values["PIPELINE_SCHEDULE"] = ("gpipe" if parallel == "threaded" else "1f1b") if schedule == "auto" else schedule
+        values["MICROBATCHES"] = _integer(config.get("microbatches", 4), "microbatches", 1)
+        if parallel == "pipeline":
+            values["TOKEN_BUDGET"] = "exact"
+            if values["MICROBATCHES"] < len(devices):
+                raise ValueError("microbatches: pipeline 的微批次数不能少于 devices 数量")
 
     if vae_encode_cfg is not None:
         values["VAE_ENCODE"] = vae_encode_cfg
@@ -411,8 +446,6 @@ def adapt_config(config, runtime):
         warnings.append("已开启训练预览但未填写 sample_prompts，已自动跳过预览采样。")
     if values["DORA_DETACH"] and not dora:
         warnings.append("已勾选 network_dora_detach，但未启用 network_dora。")
-    if parallel != "none" and sys.platform == "win32":
-        warnings.append("Windows 上游不支持多卡 PARALLEL；请保持 parallel_mode=none，或改在 Linux 上训练。")
     if tune_mode == "table" and sys.platform == "win32":
         warnings.append("若本机 MSVC 无法编译 triton-windows，请将 tune_mode 设为 off。")
     return AdaptedConfig(values, warnings, mode, comfy_paths, staging_root)
