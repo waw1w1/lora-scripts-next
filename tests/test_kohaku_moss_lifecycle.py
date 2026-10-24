@@ -128,6 +128,12 @@ def test_http_preflight_and_run_map_parameters_without_training(runtime, monkeyp
     assert values["SAMPLE_PROMPTS"] == ["a red square", "a blue square"]
     assert values["SAMPLE_SIZE"] == (768, 1024)
     assert spec["env"]["CUDA_VISIBLE_DEVICES"] == "0"
+    monkeypatch.setattr(api.tm, "tasks", {"never-executed": SimpleNamespace(metadata=spec["metadata"])})
+    restored = client.get("/api/tasks/never-executed/config").json()
+    assert restored["status"] == "success", restored
+    assert restored["data"]["backend"] == "kohaku-moss"
+    assert restored["data"]["train_type"] == "kohaku-moss-image-lora"
+    assert restored["data"]["config"] == payload
 
 
 def test_literal_engine_config_archive_never_executes_python(tmp_path):
