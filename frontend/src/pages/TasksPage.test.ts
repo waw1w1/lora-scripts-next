@@ -240,3 +240,29 @@ it("batch dialog filters dropped files to .toml and renders partial failures", a
     expect(wrapper.text()).toContain("无法识别训练类型")
   } finally { wrapper.unmount() }
 })
+
+it("returns a Kohaku task to its training module with its saved parameters", async () => {
+  const config = { model_train_type: "kohaku-moss-image-lora", network_dim: 24, memory_profile: "minimal" }
+  const wrapper = mountTasks((url) => {
+    if (url === "/api/tasks/task-kohaku/config") return {
+      config, train_type: "kohaku-moss-image-lora", backend: "kohaku-moss",
+    }
+    if (url === "/api/tasks") return { tasks: [{
+      id: "task-kohaku", status: "FINISHED", metadata: { train_type: "kohaku-moss-image-lora", backend: "kohaku-moss" },
+    }] }
+    return {}
+  })
+  try {
+    await flushPromises()
+    await wrapper.findAll(".tasks-tabs button")[1]!.trigger("click")
+    await wrapper.get(".task-row").trigger("click")
+    await flushPromises()
+    const button = wrapper.findAll("button").find(item => item.text() === i18n.global.t("tasks.detail.importTrain"))!
+    await button.trigger("click")
+    await flushPromises()
+    expect(JSON.parse(sessionStorage.getItem("mikazuki-pending-import")!)).toEqual(config)
+    expect(push).toHaveBeenCalledWith({
+      path: "/training", query: { model: "moss-image", engine: "kohaku-moss", target: "lora" },
+    })
+  } finally { wrapper.unmount() }
+})

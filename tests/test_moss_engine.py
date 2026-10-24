@@ -534,6 +534,32 @@ def test_comfy_files_preflight_materializes_native_layout(configured):
     assert check_inputs(adapted)["model_format"] == "comfyui_files"
 
 
+def test_moss_and_kohaku_alternating_materialization_preserves_both_layouts(configured):
+    from mikazuki.engines.kohaku_moss.adapter import adapt_config as adapt_kohaku
+    from mikazuki.engines.kohaku_moss.preflight import check_inputs as check_kohaku
+    from mikazuki.engines.kohaku_moss.settings import Runtime as KohakuRuntime
+
+    rt, config = configured
+    comfy = _comfy_flat_files(rt)
+    moss = adapt_config({**config, **comfy}, rt)
+    kohaku = adapt_kohaku({
+        **comfy, "model_train_type": "kohaku-moss-image-lora",
+        "train_data_dir": "images", "output_dir": "output", "output_name": "kohaku_test",
+    }, KohakuRuntime(rt.project_root))
+    generated = []
+    for _ in range(2):
+        for materialize, adapted, root in (
+            (check_inputs, moss, Path(moss.train["model_dir"])),
+            (check_kohaku, kohaku, Path(kohaku.staging_root)),
+        ):
+            result = materialize(adapted)
+            if materialize is check_kohaku:
+                assert result["ok"], result["errors"]
+            assert all(path.is_file() for path in generated)
+            generated.extend(path for path in root.rglob("*") if path.is_file())
+    assert generated
+
+
 def test_comfy_sft_requires_separate_dit_and_stages_variant(configured):
     rt, config = configured
     comfy = _comfy_flat_files(rt)

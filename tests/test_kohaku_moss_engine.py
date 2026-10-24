@@ -131,6 +131,9 @@ def test_adapter_writes_native_kogine_python_config(tmp_path):
     path = dump_config(adapted, tmp_path / "autosave", "test")
     text = Path(path).read_text(encoding="utf-8")
     assert "MEMORY_PROFILE = 'minimal'" in text
+    assert adapted.values["TEXT_ENCODE"]["pinned"] is False
+    assert "MEMORY_OVERRIDES = {'pinned': False}" in text
+    assert "PIN_MEMORY = False" in text
     assert "EXPORT_FORMATS = ('comfy', 'lycoris')" in text
     assert "SAMPLE_EVERY = 10" in text
     assert "ALGO_KWARGS =" in text
